@@ -1,0 +1,479 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TruthLens AI | Hallucination Detection</title>
+    <meta name="description"
+        content="TruthLens AI detects hallucinations in LLM outputs using NLI, HHEM, and semantic consistency scoring.">
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/static/style.css?v=10">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        /* High-Priority Theme Overrides */
+        body {
+            background: linear-gradient(135deg, #ffffff 0%, #f3f6fc 50%, #faf5ff 100%) !important;
+            background-attachment: fixed !important;
+        }
+
+        [data-theme="dark"] body {
+            background: linear-gradient(135deg, #0f172a 0%, #0c1527 50%, #171026 100%) !important;
+            background-attachment: fixed !important;
+            color: #f1f5f9 !important;
+        }
+
+        .view {
+            background: transparent !important;
+        }
+
+        [data-theme="dark"] .view {
+            background: transparent !important;
+        }
+
+        [data-theme="dark"] .settings-card,
+        [data-theme="dark"] .panel-card {
+            background: #1e293b !important;
+            border-color: rgba(255, 255, 255, 0.1) !important;
+            color: #f1f5f9 !important;
+        }
+
+        [data-theme="dark"] .navbar {
+            background: rgba(15, 23, 42, 0.9) !important;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1) !important;
+        }
+
+        [data-theme="dark"] .nav-link,
+        [data-theme="dark"] .page-title,
+        [data-theme="dark"] .sn {
+            color: #f1f5f9 !important;
+        }
+
+        /* Form Inputs Color Corrections */
+        .form-input {
+            color: #1e293b !important;
+            background-color: #ffffff !important;
+            border: 1px solid #cbd5e1 !important;
+            border-radius: 6px;
+            padding: 0.6rem 0.8rem;
+            font-size: 0.95rem;
+            outline: none;
+            transition: border-color 0.2s ease, box-shadow 0.2s ease;
+        }
+        .form-input:focus {
+            background-color: #ffffff !important;
+            border-color: var(--primary) !important;
+            box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.15) !important;
+        }
+        .form-input option {
+            color: #1e293b !important;
+            background-color: #ffffff !important;
+        }
+        .form-input::placeholder {
+            color: #64748b !important;
+            opacity: 0.8;
+        }
+
+        /* Dark Theme overrides for Contact Form */
+        [data-theme="dark"] .contact-form-container {
+            background: #1e293b !important;
+            border-color: rgba(255, 255, 255, 0.1) !important;
+        }
+        [data-theme="dark"] .form-input {
+            color: #f1f5f9 !important;
+            background-color: #0f172a !important;
+            border-color: rgba(255, 255, 255, 0.15) !important;
+        }
+        [data-theme="dark"] .form-input:focus {
+            background-color: #0f172a !important;
+            color: #f1f5f9 !important;
+        }
+        [data-theme="dark"] .form-input option {
+            color: #f1f5f9 !important;
+            background-color: #0f172a !important;
+        }
+
+
+
+        /* Smooth Transition */
+        body {
+            transition: background 0.3s ease, color 0.3s ease;
+        }
+
+        /* Clickable Contact Methods and Socials Styles & Hover Effects */
+        a.contact-method {
+            text-decoration: none;
+            color: inherit;
+            cursor: pointer;
+            transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        a.contact-method:hover {
+            transform: translateY(-2px) scale(1.02);
+        }
+        a.contact-method:hover .cm-icon {
+            box-shadow: 0 0 15px rgba(99, 102, 241, 0.4);
+            transform: scale(1.05);
+            transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        [data-theme="dark"] a.contact-method:hover .cm-icon {
+            box-shadow: 0 0 20px rgba(129, 140, 248, 0.5);
+            background: #1e293b;
+        }
+        .contact-socials a {
+            transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.25s cubic-bezier(0.4, 0, 0.2, 1), background-color 0.25s ease, color 0.25s ease !important;
+        }
+        .contact-socials a:hover {
+            transform: scale(1.1) translateY(-2px) !important;
+            box-shadow: 0 0 15px rgba(99, 102, 241, 0.5) !important;
+        }
+    </style>
+    <script>
+        function setTheme(theme) {
+            console.log('Force applying theme:', theme);
+            document.documentElement.setAttribute('data-theme', theme);
+            localStorage.setItem('truthlens_theme', theme);
+
+            // Sync with existing buttons if they exist
+            const lightBtn = document.getElementById('theme-light-btn');
+            const darkBtn = document.getElementById('theme-dark-btn');
+            if (lightBtn && darkBtn) {
+                if (theme === 'dark') {
+                    darkBtn.classList.add('active');
+                    lightBtn.classList.remove('active');
+                } else {
+                    lightBtn.classList.add('active');
+                    darkBtn.classList.remove('active');
+                }
+            }
+        }
+        // Early load to prevent flicker
+        const saved = localStorage.getItem('truthlens_theme') || 'light';
+        document.documentElement.setAttribute('data-theme', saved);
+
+        // --- Chat File Logic ---
+        function triggerChatUpload() {
+            console.log('Triggering chat upload...');
+            document.getElementById('chat-file-input')?.click();
+        }
+
+        async function handleChatFileSelect(input) {
+            const file = input.files[0];
+            if (!file) return;
+
+            console.log('File selected:', file.name);
+            // We call the global app.js logic via a custom event or direct call
+            if (window.truthLens_handleFileUpload) {
+                window.truthLens_handleFileUpload(file);
+            } else {
+                console.error('App logic not loaded yet');
+            }
+        }
+    </script>
+    <!-- Polyfill for import maps support in all browsers -->
+    <script async src="https://ga.jspm.io/msx/1.10.3/es-module-shims.js"></script>
+    <script type="importmap">
+        {
+            "imports": {
+                "@emailjs/browser": "https://cdn.jsdelivr.net/npm/@emailjs/browser@4.4.1/+esm"
+            }
+        }
+    </script>
+</head>
+
+<body>
+    <div class="background-blobs">
+        <div class="blob b1"></div>
+        <div class="blob b2"></div>
+        <div class="blob b3"></div>
+    </div>
+
+    <nav class="navbar">
+        <div class="logo">
+            <i class="fa-solid fa-brain"></i>
+            <span>TruthLens <strong>AI</strong></span>
+        </div>
+                <div class="nav-links">
+            <a href="/" class="nav-link" data-view="home">Home</a>
+            <a href="/dashboard" class="nav-link" data-view="dashboard">Dashboard</a>
+            <a href="/chat" class="nav-link" data-view="chat">Chat</a>
+            <a href="/analysis" class="nav-link" data-view="analysis">Analysis</a>
+            <a href="/features" class="nav-link" data-view="features">Features</a>
+            <a href="/contact" class="nav-link active" data-view="contact">Contact</a>
+            <a href="/settings" class="nav-link" data-view="settings">Settings</a>
+            <a href="/login" class="nav-link" data-view="login" id="nav-login-btn">Login</a>
+            </div>
+        <button class="btn-primary btn-sm" id="new-analysis-btn">
+            <i class="fa-solid fa-wand-magic-sparkles"></i> New Analysis
+        </button>
+    </nav>
+
+    
+<div id="view-contact" class="view active-view">
+        <div class="content-container">
+            <section class="feat-hero">
+                <h1>Get in <span class="text-gradient">Touch</span></h1>
+                <p>Whether you're looking for enterprise integration, research collaboration, or technical support, our
+                    team is here to help.</p>
+            </section>
+
+            <div class="contact-layout">
+                <div class="contact-info">
+                    <h3>Contact Information</h3>
+                    <p class="contact-desc">Reach out directly to the TruthLens research and engineering team.</p>
+
+                    <a href="mailto:truthlens.verify@gmail.com" class="contact-method">
+                        <div class="cm-icon"><i class="fa-solid fa-envelope"></i></div>
+                        <div class="cm-details">
+                            <h4>General Inquiries</h4>
+                            <p>truthlens.verify@gmail.com</p>
+                        </div>
+                    </a>
+
+                    <a href="mailto:truthlens.verify@gmail.com" class="contact-method">
+                        <div class="cm-icon"><i class="fa-solid fa-envelope"></i></div>
+                        <div class="cm-details">
+                            <h4>Technical Support</h4>
+                            <p>truthlens.verify@gmail.com</p>
+                        </div>
+                    </a>
+
+                    <a href="mailto:truthlens.verify@gmail.com" class="contact-method">
+                        <div class="cm-icon"><i class="fa-solid fa-envelope"></i></div>
+                        <div class="cm-details">
+                            <h4>Business / Partnerships</h4>
+                            <p>truthlens.verify@gmail.com</p>
+                        </div>
+                    </a>
+
+                    <a href="https://github.com/truthlensverify" target="_blank" rel="noopener noreferrer" class="contact-method">
+                        <div class="cm-icon"><i class="fa-brands fa-github"></i></div>
+                        <div class="cm-details">
+                            <h4>Open Source</h4>
+                            <p>github.com/truthlensverify</p>
+                        </div>
+                    </a>
+
+                    <div class="contact-socials">
+                        <a href="mailto:truthlens.verify@gmail.com" title="Email"><i class="fa-solid fa-envelope"></i></a>
+                        <a href="https://github.com/truthlensverify" target="_blank" rel="noopener noreferrer" title="GitHub"><i class="fa-brands fa-github"></i></a>
+                    </div>
+                </div>
+
+                <div class="contact-form-container">
+                    <form id="contact-form" class="professional-form" onSubmit={sendEmail}>
+                        <!-- Honeypot anti-spam field (hidden from users) -->
+                        <div style="display: none;">
+                            <label>Leave this field blank</label>
+                            <input type="text" id="contact-honeypot" name="honeypot" tabindex="-1" autocomplete="off" />
+                        </div>
+
+                        <div class="form-row">
+                            <div class="db-field half-width">
+                                <label class="field-label">First Name</label>
+                                <input type="text" id="contact-first-name" name="first_name" required placeholder="John" class="form-input" />
+                            </div>
+                            <div class="db-field half-width">
+                                <label class="field-label">Last Name</label>
+                                <input type="text" id="contact-last-name" name="last_name" required placeholder="Doe" class="form-input" />
+                            </div>
+                        </div>
+
+                        <div class="db-field">
+                            <label class="field-label">Work Email</label>
+                            <input type="email" id="contact-email" name="email" required placeholder="john@company.com" class="form-input" />
+                        </div>
+
+                        <div class="db-field">
+                            <label class="field-label">Inquiry Type</label>
+                            <select class="form-input" id="contact-inquiry-type" name="inquiry_type">
+                                <option value="enterprise">Enterprise Integration</option>
+                                <option value="research">Research Collaboration</option>
+                                <option value="support">Technical Support</option>
+                                <option value="partners">Business / Partnerships</option>
+                                <option value="feedback">General Feedback</option>
+                            </select>
+                        </div>
+
+                        <div class="db-field">
+                            <label class="field-label">Message</label>
+                            <textarea id="contact-message" name="message" required placeholder="How can we help you?" class="form-input"
+                                rows="4"></textarea>
+                        </div>
+
+                        <button type="submit" id="contact-submit-btn" class="btn-primary w-100" style="margin-top: 1rem;">
+                            Send Message <i class="fa-solid fa-paper-plane" style="margin-left: 0.5rem;"></i>
+                        </button>
+                        
+                        <!-- Alert block for success/error feedback -->
+                        <div id="contact-status-msg" class="hidden" style="margin-top: 1rem; padding: 0.75rem; border-radius: 6px; font-size: 0.95rem; text-align: center; border: 1px solid transparent;"></div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+<!-- Interactive Hover Tooltip -->
+    <div id="truthlens-tooltip" class="tl-tooltip hidden">
+        <div class="tl-tooltip-header">
+            <span id="tt-type">Claim Type</span>
+            <span id="tt-status" class="tt-status-pill">Status</span>
+        </div>
+        <div class="tl-tooltip-meta">
+            <i class="fa-solid fa-bullseye"></i> Confidence: <span id="tt-conf">0%</span>
+        </div>
+        <div class="tl-tooltip-reason" id="tt-reason">
+            Reason details will appear here.
+        </div>
+    </div>
+
+    <script type="module">
+        import emailjs from '@emailjs/browser';
+
+        // Initialize EmailJS
+        emailjs.init('FECJizmn_Yp4bdv2_');
+
+        // Form Fields elements
+        const firstNameInput = document.getElementById('contact-first-name');
+        const lastNameInput = document.getElementById('contact-last-name');
+        const emailInput = document.getElementById('contact-email');
+        const inquiryTypeInput = document.getElementById('contact-inquiry-type');
+        const messageInput = document.getElementById('contact-message');
+        const honeypotInput = document.getElementById('contact-honeypot');
+        const submitBtn = document.getElementById('contact-submit-btn');
+        const statusMsg = document.getElementById('contact-status-msg');
+        const contactForm = document.getElementById('contact-form');
+
+        // Controlled form fields state object
+        const formData = {
+            firstName: firstNameInput ? firstNameInput.value : '',
+            lastName: lastNameInput ? lastNameInput.value : '',
+            email: emailInput ? emailInput.value : '',
+            inquiryType: inquiryTypeInput ? inquiryTypeInput.value : 'enterprise',
+            message: messageInput ? messageInput.value : ''
+        };
+
+        // Attach listeners to sync values into state object (controlled fields)
+        firstNameInput?.addEventListener('input', (e) => formData.firstName = e.target.value);
+        lastNameInput?.addEventListener('input', (e) => formData.lastName = e.target.value);
+        emailInput?.addEventListener('input', (e) => formData.email = e.target.value);
+        inquiryTypeInput?.addEventListener('change', (e) => formData.inquiryType = e.target.value);
+        messageInput?.addEventListener('input', (e) => formData.message = e.target.value);
+
+        async function sendEmail(e) {
+            e.preventDefault();
+
+            const showStatus = (text, type) => {
+                if (!statusMsg) return;
+                statusMsg.textContent = text;
+                statusMsg.classList.remove('hidden');
+                if (type === 'success') {
+                    statusMsg.style.backgroundColor = 'rgba(16, 185, 129, 0.15)';
+                    statusMsg.style.color = '#10b981';
+                    statusMsg.style.borderColor = 'rgba(16, 185, 129, 0.3)';
+                } else {
+                    statusMsg.style.backgroundColor = 'rgba(239, 68, 68, 0.15)';
+                    statusMsg.style.color = '#ef4444';
+                    statusMsg.style.borderColor = 'rgba(239, 68, 68, 0.3)';
+                }
+            };
+
+            const firstNameVal = formData.firstName.trim();
+            const lastNameVal = formData.lastName.trim();
+            const emailVal = formData.email.trim();
+            const inquiryTypeVal = formData.inquiryType;
+            const messageVal = formData.message.trim();
+            const honeypotVal = honeypotInput ? honeypotInput.value : '';
+
+            if (!firstNameVal || !lastNameVal) {
+                showStatus('First name and last name are required.', 'error');
+                return;
+            }
+
+            const emailRegex = /^[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+$/;
+            if (!emailRegex.test(emailVal)) {
+                showStatus('Please enter a valid email address.', 'error');
+                return;
+            }
+
+            if (messageVal.length < 10) {
+                showStatus('Message must be at least 10 characters long.', 'error');
+                return;
+            }
+
+            // Log formData to console for debugging as requested
+            console.log(formData);
+
+            let originalBtnHTML = '';
+            if (submitBtn) {
+                submitBtn.disabled = true;
+                originalBtnHTML = submitBtn.innerHTML;
+                submitBtn.innerHTML = 'Sending... <i class="fa-solid fa-spinner fa-spin" style="margin-left: 0.5rem;"></i>';
+            }
+            if (statusMsg) {
+                statusMsg.classList.add('hidden');
+            }
+
+            try {
+                console.log("Executing EmailJS send...");
+                const result = await emailjs.send('service_v3bq3tp', 'template_ypa9tff', {
+                    from_name: formData.firstName + ' ' + formData.lastName,
+                    from_email: formData.email,
+                    inquiry_type: formData.inquiryType,
+                    message: formData.message,
+                }, 'FECJizmn_Yp4bdv2_');
+
+                // Log result to console for debugging as requested
+                console.log(result);
+
+                // Save to local database via API
+                const res = await fetch('/api/contact', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        first_name: firstNameVal,
+                        last_name: lastNameVal,
+                        email: emailVal,
+                        inquiry_type: inquiryTypeVal,
+                        message: messageVal,
+                        honeypot: honeypotVal
+                    })
+                });
+
+                const data = await res.json();
+
+                alert('Message sent successfully!');
+                showStatus(data.message || 'Your message has been sent successfully. Our team will contact you soon.', 'success');
+                if (contactForm) {
+                    contactForm.reset();
+                    formData.firstName = '';
+                    formData.lastName = '';
+                    formData.email = '';
+                    formData.inquiryType = 'enterprise';
+                    formData.message = '';
+                }
+            } catch (error) {
+                // Log error to console for debugging as requested
+                console.log(error);
+                alert('Failed to send message.');
+                showStatus('Failed to send message. Please check your connection and try again.', 'error');
+            } finally {
+                if (submitBtn) {
+                    submitBtn.disabled = false;
+                    submitBtn.innerHTML = originalBtnHTML;
+                }
+            }
+        }
+
+        window.sendEmail = sendEmail;
+
+        if (contactForm) {
+            contactForm.addEventListener('submit', sendEmail);
+            contactForm.onsubmit = sendEmail;
+        }
+    </script>
+    <script src="/static/app.js?v=11"></script>
+</body>
+
+</html>

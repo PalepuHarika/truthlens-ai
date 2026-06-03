@@ -1,0 +1,271 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TruthLens AI | Features Overview</title>
+    <meta name="description" content="TruthLens AI provides multi-signal LLM verification features including NLI, Grounding, Cross-checking, and Heatmaps.">
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/static/style.css?v=10">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        /* High-Priority Theme Overrides */
+        body {
+            background: linear-gradient(135deg, #ffffff 0%, #f3f6fc 50%, #faf5ff 100%) !important;
+            background-attachment: fixed !important;
+        }
+
+        [data-theme="dark"] body {
+            background: linear-gradient(135deg, #0f172a 0%, #0c1527 50%, #171026 100%) !important;
+            background-attachment: fixed !important;
+            color: #f1f5f9 !important;
+        }
+
+        .view {
+            background: transparent !important;
+        }
+
+        [data-theme="dark"] .view {
+            background: transparent !important;
+        }
+
+        [data-theme="dark"] .panel-card {
+            background: #1e293b !important;
+            border-color: rgba(255, 255, 255, 0.1) !important;
+            color: #f1f5f9 !important;
+        }
+
+        [data-theme="dark"] .navbar {
+            background: rgba(15, 23, 42, 0.9) !important;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1) !important;
+        }
+
+        [data-theme="dark"] .nav-link,
+        [data-theme="dark"] .page-title {
+            color: #f1f5f9 !important;
+        }
+
+        body {
+            transition: background 0.3s ease, color 0.3s ease;
+        }
+    </style>
+    <script>
+        function setTheme(theme) {
+            document.documentElement.setAttribute('data-theme', theme);
+            localStorage.setItem('truthlens_theme', theme);
+        }
+        const saved = localStorage.getItem('truthlens_theme') || 'light';
+        document.documentElement.setAttribute('data-theme', saved);
+    </script>
+</head>
+
+<body>
+    <div class="background-blobs">
+        <div class="blob b1"></div>
+        <div class="blob b2"></div>
+        <div class="blob b3"></div>
+    </div>
+
+    <nav class="navbar">
+        <div class="logo" onclick="navigateTo('home')" style="cursor: pointer;">
+            <i class="fa-solid fa-brain"></i>
+            <span>TruthLens <strong>AI</strong></span>
+        </div>
+                <div class="nav-links">
+            <a href="/" class="nav-link" data-view="home">Home</a>
+            <a href="/dashboard" class="nav-link" data-view="dashboard">Dashboard</a>
+            <a href="/chat" class="nav-link" data-view="chat">Chat</a>
+            <a href="/analysis" class="nav-link" data-view="analysis">Analysis</a>
+            <a href="/features" class="nav-link active" data-view="features">Features</a>
+            <a href="/contact" class="nav-link" data-view="contact">Contact</a>
+            <a href="/settings" class="nav-link" data-view="settings">Settings</a>
+            <a href="/login" class="nav-link" data-view="login" id="nav-login-btn">Login</a>
+            </div>
+        <button class="btn-primary btn-sm" id="new-analysis-btn">
+            <i class="fa-solid fa-wand-magic-sparkles"></i> New Analysis
+        </button>
+    </nav>
+
+    <div id="view-features" class="view active-view">
+        <div class="content-container">
+            <section class="feat-hero">
+                <div class="icon-wrap bg-purple"><i class="fa-solid fa-sparkles"></i></div>
+                <h1>System <span class="text-gradient">Capabilities</span> & Features</h1>
+                <p>TruthLens AI incorporates five independent detection and analysis layers to identify generative model errors.</p>
+            </section>
+
+            <div class="features-grid-2x2">
+                <div class="feature-card" onclick="navigateTo('feat-nli')" style="cursor: pointer;">
+                    <div class="card-header">
+                        <div class="icon bg-blue"><i class="fa-solid fa-shield-halved"></i></div>
+                        <h3>Multi-Model NLI Verification</h3>
+                    </div>
+                    <div class="card-body">
+                        <p>Cross-references claims against trusted knowledge bases and local documents using advanced Natural Language Inference reasoning.</p>
+                        <div class="card-visual">
+                            <div class="visual-nli-bars">
+                                <div class="v-bar-row">
+                                    <span class="v-bar-label">Entailment</span>
+                                    <div class="v-bar-track"><div class="v-bar-fill entail" style="width: 94%"></div></div>
+                                    <span class="v-bar-val">94%</span>
+                                </div>
+                                <div class="v-bar-row">
+                                    <span class="v-bar-label">Neutral</span>
+                                    <div class="v-bar-track"><div class="v-bar-fill neutral" style="width: 5%"></div></div>
+                                    <span class="v-bar-val">5%</span>
+                                </div>
+                                <div class="v-bar-row">
+                                    <span class="v-bar-label">Contradiction</span>
+                                    <div class="v-bar-track"><div class="v-bar-fill contradict" style="width: 1%"></div></div>
+                                    <span class="v-bar-val">1%</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="card-footer">
+                        <span class="metric-badge"><i class="fa-solid fa-circle-check"></i> 98% verification accuracy</span>
+                        <button class="btn-explore-pill">Explore NLI <i class="fa-solid fa-arrow-right"></i></button>
+                    </div>
+                </div>
+
+                <div class="feature-card" onclick="navigateTo('feat-grounding')" style="cursor: pointer;">
+                    <div class="card-header">
+                        <div class="icon bg-teal"><i class="fa-solid fa-magnifying-glass-chart"></i></div>
+                        <h3>Factual Grounding Search</h3>
+                    </div>
+                    <div class="card-body">
+                        <p>Integrates real-time semantic web retrieval to verify current events and time-sensitive facts using Google / Wikipedia APIs.</p>
+                        <div class="card-visual">
+                            <div class="visual-grounding-sources">
+                                <div class="source-item">
+                                    <span class="source-icon wiki"><i class="fa-brands fa-wikipedia-w"></i></span>
+                                    <span class="source-name">Wikipedia API</span>
+                                    <span class="source-status verified">Grounded</span>
+                                </div>
+                                <div class="source-item">
+                                    <span class="source-icon google"><i class="fa-brands fa-google"></i></span>
+                                    <span class="source-name">Google Search</span>
+                                    <span class="source-status verified">Grounded</span>
+                                </div>
+                                <div class="source-item">
+                                    <span class="source-icon pubmed"><i class="fa-solid fa-book-medical"></i></span>
+                                    <span class="source-name">PubMed Central</span>
+                                    <span class="source-status pending">Analyzing</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="card-footer">
+                        <span class="metric-badge"><i class="fa-solid fa-globe"></i> 25+ trusted sources</span>
+                        <button class="btn-explore-pill">Explore Grounding <i class="fa-solid fa-arrow-right"></i></button>
+                    </div>
+                </div>
+
+                <div class="feature-card" onclick="navigateTo('feat-crosscheck')" style="cursor: pointer;">
+                    <div class="card-header">
+                        <div class="icon bg-cyan"><i class="fa-solid fa-layer-group"></i></div>
+                        <h3>Multi-LLM Comparison Engine</h3>
+                    </div>
+                    <div class="card-body">
+                        <p>Simulates various state-of-the-art architectures (GPT, Claude, Gemini) in real time to locate factual variance and disagreements.</p>
+                        <div class="card-visual">
+                            <div class="visual-llm-comparison">
+                                <div class="llm-compare-row">
+                                    <span class="llm-badge gpt">GPT-4o</span>
+                                    <div class="llm-bar-track"><div class="llm-bar-fill agree" style="width: 100%"></div></div>
+                                    <span class="llm-status-text consensus">Agree</span>
+                                </div>
+                                <div class="llm-compare-row">
+                                    <span class="llm-badge claude">Claude 3.5</span>
+                                    <div class="llm-bar-track"><div class="llm-bar-fill agree" style="width: 100%"></div></div>
+                                    <span class="llm-status-text consensus">Agree</span>
+                                </div>
+                                <div class="llm-compare-row">
+                                    <span class="llm-badge llama">Llama 3</span>
+                                    <div class="llm-bar-track"><div class="llm-bar-fill disagree" style="width: 25%"></div></div>
+                                    <span class="llm-status-text conflict">Variance</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="card-footer">
+                        <span class="metric-badge"><i class="fa-solid fa-chart-bar"></i> Multi-model consensus</span>
+                        <button class="btn-explore-pill">Explore Comparison <i class="fa-solid fa-arrow-right"></i></button>
+                    </div>
+                </div>
+
+                <div class="feature-card" onclick="navigateTo('feat-heatmap')" style="cursor: pointer;">
+                    <div class="card-header">
+                        <div class="icon bg-purple"><i class="fa-solid fa-fire-flame-curved"></i></div>
+                        <h3>Factual Heatmap Visualization</h3>
+                    </div>
+                    <div class="card-body">
+                        <p>Highlights token and sentence-level factual probability so users can verify exactly which sentences have factual support.</p>
+                        <div class="card-visual">
+                            <div class="visual-heatmap-preview">
+                                <span class="heatmap-word verified">TruthLens AI is a</span>
+                                <span class="heatmap-word verified">grounding tool that</span>
+                                <span class="heatmap-word weak">detects facts</span>
+                                <span class="heatmap-word verified">using an</span>
+                                <span class="heatmap-word contradicted">NLI engine</span>
+                                <span class="heatmap-word verified">to verify</span>
+                                <span class="heatmap-word verified">claims in</span>
+                                <span class="heatmap-word verified">LLM outputs.</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="card-footer">
+                        <span class="metric-badge"><i class="fa-solid fa-bolt"></i> Real-time grounding</span>
+                        <button class="btn-explore-pill">Explore Heatmap <i class="fa-solid fa-arrow-right"></i></button>
+                    </div>
+                </div>
+            </div>
+
+            <section class="feat-hero" style="margin-top: 5rem; padding-bottom: 2rem;">
+                <h1>Core pipeline architecture</h1>
+                <p>TruthLens runs your prompts and outputs through consecutive processing stages to extract, search, verify and grade AI credibility.</p>
+            </section>
+
+            <div class="arch-viz-full" style="margin-bottom: 5rem;">
+                <div class="arch-node">Input Prompt & AI Response</div>
+                <div class="arch-line"><i class="fa-solid fa-arrow-down"></i></div>
+                <div class="arch-row" style="display: flex; gap: 2rem; justify-content: center;">
+                    <div class="arch-node sub">Semantic Document Retrieval (FAISS RAG)</div>
+                    <div class="arch-node sub">Live Web Verification Search</div>
+                </div>
+                <div class="arch-line"><i class="fa-solid fa-arrow-down"></i></div>
+                <div class="arch-node major">TruthLens Processing Core</div>
+                <div class="arch-subgrid" style="display: flex; gap: 1rem; justify-content: center; margin-top: 1rem;">
+                    <div class="arch-node mini">NLI Contradiction</div>
+                    <div class="arch-node mini">Semantic Coherence</div>
+                </div>
+                <div class="arch-line"><i class="fa-solid fa-arrow-down"></i></div>
+                <div class="arch-node result">Trust Metrics, Heatmaps, and Grounded Corrections</div>
+            </div>
+        </div>
+    </div>
+
+    <footer class="main-footer">
+        <div class="footer-content">
+            <div class="footer-logo">
+                <i class="fa-solid fa-brain"></i> TruthLens <strong>AI</strong>
+            </div>
+            <div class="footer-links">
+                <a href="/">Home</a>
+                <a href="/dashboard">Dashboard</a>
+                <a href="/chat">Chat</a>
+                <a href="/about">About</a>
+                <a href="/contact">Contact</a>
+                <a href="/settings">Settings</a>
+            </div>
+            <div class="footer-copy">
+                &copy; 2026 TruthLens AI Research Project. All rights reserved.
+            </div>
+        </div>
+    </footer>
+
+    <script src="/static/app.js?v=11"></script>
+</body>
+
+</html>

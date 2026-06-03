@@ -1,0 +1,343 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TruthLens AI | Hallucination Detection</title>
+    <meta name="description"
+        content="TruthLens AI detects hallucinations in LLM outputs using NLI, HHEM, and semantic consistency scoring.">
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/static/style.css?v=10">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        /* High-Priority Theme Overrides */
+        body {
+            background: linear-gradient(135deg, #ffffff 0%, #f3f6fc 50%, #faf5ff 100%) !important;
+            background-attachment: fixed !important;
+        }
+
+        [data-theme="dark"] body {
+            background: linear-gradient(135deg, #0f172a 0%, #0c1527 50%, #171026 100%) !important;
+            background-attachment: fixed !important;
+            color: #f1f5f9 !important;
+        }
+
+        .view {
+            background: transparent !important;
+        }
+
+        [data-theme="dark"] .view {
+            background: transparent !important;
+        }
+
+        [data-theme="dark"] .settings-card,
+        [data-theme="dark"] .panel-card {
+            background: #1e293b !important;
+            border-color: rgba(255, 255, 255, 0.1) !important;
+            color: #f1f5f9 !important;
+        }
+
+        [data-theme="dark"] .navbar {
+            background: rgba(15, 23, 42, 0.9) !important;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1) !important;
+        }
+
+        [data-theme="dark"] .nav-link,
+        [data-theme="dark"] .page-title,
+        [data-theme="dark"] .sn {
+            color: #f1f5f9 !important;
+        }
+
+        /* Form Inputs Color Corrections */
+        .form-input {
+            color: #1e293b !important;
+            background-color: #ffffff !important;
+            border: 1px solid #cbd5e1 !important;
+            border-radius: 6px;
+            padding: 0.6rem 0.8rem;
+            font-size: 0.95rem;
+            outline: none;
+            transition: border-color 0.2s ease, box-shadow 0.2s ease;
+        }
+        .form-input:focus {
+            background-color: #ffffff !important;
+            border-color: var(--primary) !important;
+            box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.15) !important;
+        }
+        .form-input option {
+            color: #1e293b !important;
+            background-color: #ffffff !important;
+        }
+        .form-input::placeholder {
+            color: #64748b !important;
+            opacity: 0.8;
+        }
+
+        /* Dark Theme overrides for Contact Form */
+        [data-theme="dark"] .contact-form-container {
+            background: #1e293b !important;
+            border-color: rgba(255, 255, 255, 0.1) !important;
+        }
+        [data-theme="dark"] .form-input {
+            color: #f1f5f9 !important;
+            background-color: #0f172a !important;
+            border-color: rgba(255, 255, 255, 0.15) !important;
+        }
+        [data-theme="dark"] .form-input:focus {
+            background-color: #0f172a !important;
+            color: #f1f5f9 !important;
+        }
+        [data-theme="dark"] .form-input option {
+            color: #f1f5f9 !important;
+            background-color: #0f172a !important;
+        }
+
+
+
+        /* Smooth Transition */
+        body {
+            transition: background 0.3s ease, color 0.3s ease;
+        }
+    </style>
+    <script>
+        function setTheme(theme) {
+            console.log('Force applying theme:', theme);
+            document.documentElement.setAttribute('data-theme', theme);
+            localStorage.setItem('truthlens_theme', theme);
+
+            // Sync with existing buttons if they exist
+            const lightBtn = document.getElementById('theme-light-btn');
+            const darkBtn = document.getElementById('theme-dark-btn');
+            if (lightBtn && darkBtn) {
+                if (theme === 'dark') {
+                    darkBtn.classList.add('active');
+                    lightBtn.classList.remove('active');
+                } else {
+                    lightBtn.classList.add('active');
+                    darkBtn.classList.remove('active');
+                }
+            }
+        }
+        // Early load to prevent flicker
+        const saved = localStorage.getItem('truthlens_theme') || 'light';
+        document.documentElement.setAttribute('data-theme', saved);
+
+        // --- Chat File Logic ---
+        function triggerChatUpload() {
+            console.log('Triggering chat upload...');
+            document.getElementById('chat-file-input')?.click();
+        }
+
+        async function handleChatFileSelect(input) {
+            const file = input.files[0];
+            if (!file) return;
+
+            console.log('File selected:', file.name);
+            // We call the global app.js logic via a custom event or direct call
+            if (window.truthLens_handleFileUpload) {
+                window.truthLens_handleFileUpload(file);
+            } else {
+                console.error('App logic not loaded yet');
+            }
+        }
+    </script>
+</head>
+
+<body>
+    <div class="background-blobs">
+        <div class="blob b1"></div>
+        <div class="blob b2"></div>
+        <div class="blob b3"></div>
+    </div>
+
+    <nav class="navbar">
+        <div class="logo">
+            <i class="fa-solid fa-brain"></i>
+            <span>TruthLens <strong>AI</strong></span>
+        </div>
+                <div class="nav-links">
+            <a href="/" class="nav-link" data-view="home">Home</a>
+            <a href="/dashboard" class="nav-link" data-view="dashboard">Dashboard</a>
+            <a href="/chat" class="nav-link" data-view="chat">Chat</a>
+            <a href="/analysis" class="nav-link" data-view="analysis">Analysis</a>
+            <a href="/features" class="nav-link active" data-view="features">Features</a>
+            <a href="/contact" class="nav-link" data-view="contact">Contact</a>
+            <a href="/settings" class="nav-link" data-view="settings">Settings</a>
+            <a href="/login" class="nav-link" data-view="login" id="nav-login-btn">Login</a>
+            </div>
+        <button class="btn-primary btn-sm" id="new-analysis-btn">
+            <i class="fa-solid fa-wand-magic-sparkles"></i> New Analysis
+        </button>
+    </nav>
+
+    
+<div id="view-feat-nli" class="view active-view">
+        <div class="content-container">
+            <button class="back-link" onclick="navigateTo('home')"><i class="fa-solid fa-arrow-left"></i> Back to
+                Home</button>
+            <section class="feat-hero">
+                <div class="icon-wrap bg-blue"><i class="fa-solid fa-shield-halved"></i></div>
+                <h1>Multi-Model <span class="text-gradient">NLI Verification</span></h1>
+                <p>Ensuring factual consistency by mathematically comparing claims against verified evidence.</p>
+            </section>
+
+            <div class="feat-grid">
+                <div class="feat-main">
+                    <div class="feat-section">
+                        <h2><i class="fa-solid fa-circle-question"></i> Why This Matters</h2>
+                        <p class="feat-desc">Large Language Models (LLMs) often generate "stable hallucinations"—statements that sound extremely confident and plausible but are factually incorrect. Traditional keyword matching fails here. NLI (Natural Language Inference) allows us to mathematically verify if a generated claim <strong>is actually supported</strong> by the evidence.</p>
+                    </div>
+
+                    <div class="feat-section">
+                        <h2><i class="fa-solid fa-diagram-project"></i> Reasoning Pipeline</h2>
+                        <div class="pipeline-viz horizontal">
+                            <div class="pv-step active" data-step="1">
+                                <div class="pv-step-badge">1</div>
+                                <span class="pv-step-title">Claim Extraction</span>
+                                <p class="pv-step-desc">Extracts atomic claims from response</p>
+                            </div>
+                            <div class="pv-connector">
+                                <div class="pv-line"></div>
+                                <i class="fa-solid fa-chevron-right pv-arrow-icon"></i>
+                            </div>
+                            <div class="pv-step active" data-step="2">
+                                <div class="pv-step-badge">2</div>
+                                <span class="pv-step-title">Evidence Retrieval</span>
+                                <p class="pv-step-desc">Fetches reference texts via RAG</p>
+                            </div>
+                            <div class="pv-connector">
+                                <div class="pv-line"></div>
+                                <i class="fa-solid fa-chevron-right pv-arrow-icon"></i>
+                            </div>
+                            <div class="pv-step result" data-step="3">
+                                <div class="pv-step-badge"><i class="fa-solid fa-shield-halved"></i></div>
+                                <span class="pv-step-title">NLI Verification</span>
+                                <p class="pv-step-desc">Calculates contradiction levels</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="feat-section">
+                        <h2><i class="fa-solid fa-chart-simple"></i> Model Confidence</h2>
+                        <div class="confidence-container">
+                            <div class="conf-row">
+                                <span class="conf-label">Entailment (Safe)</span>
+                                <div class="progress-bar">
+                                    <div class="progress-fill success" style="width: 82%;"></div>
+                                </div>
+                                <span class="conf-val">82%</span>
+                            </div>
+                            <div class="conf-row">
+                                <span class="conf-label">Neutral (Unverified)</span>
+                                <div class="progress-bar">
+                                    <div class="progress-fill warn" style="width: 10%;"></div>
+                                </div>
+                                <span class="conf-val">10%</span>
+                            </div>
+                            <div class="conf-row">
+                                <span class="conf-label">Contradiction (Hallucination)</span>
+                                <div class="progress-bar">
+                                    <div class="progress-fill danger" style="width: 8%;"></div>
+                                </div>
+                                <span class="conf-val">8%</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="feat-section">
+                        <h2><i class="fa-solid fa-keyboard"></i> Try It Yourself</h2>
+                        <div class="interactive-demo-box">
+                            <input type="text"
+                                placeholder="Enter a claim to verify (e.g. 'Paris is the capital of Germany')"
+                                id="nli-demo-input">
+                            <button class="btn-primary"
+                                onclick="alert('NLI Analysis Started: Analyzing claim against global knowledge base...')">Analyze Claim</button>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="feat-side">
+                    <div class="metrics-card compact-analytics-card">
+                        <h3><i class="fa-solid fa-microchip"></i> Performance Metrics</h3>
+                        <div class="metric-group">
+                            <div class="metric-item">
+                                <div class="m-header">
+                                    <span class="m-label">NLI Accuracy</span>
+                                    <span class="m-val">91.2%</span>
+                                </div>
+                                <div class="m-progress"><div class="m-fill" style="width: 91.2%"></div></div>
+                            </div>
+                            <div class="metric-item">
+                                <div class="m-header">
+                                    <span class="m-label">Recall Rate</span>
+                                    <span class="m-val">93.0%</span>
+                                </div>
+                                <div class="m-progress"><div class="m-fill" style="width: 93.0%"></div></div>
+                            </div>
+                            <div class="metric-item">
+                                <div class="m-header">
+                                    <span class="m-label">Avg. Latency</span>
+                                    <span class="m-val">42ms</span>
+                                </div>
+                                <div class="m-progress"><div class="m-fill speed" style="width: 85%"></div></div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="feat-card demo-card premium-demo-card">
+                        <h3><i class="fa-solid fa-flask"></i> Example Detection</h3>
+                        <div class="demo-box">
+                            <div class="demo-item">
+                                <div class="demo-meta">
+                                    <span class="dm-label"><i class="fa-solid fa-terminal"></i> Input Prompt</span>
+                                </div>
+                                <div class="db-text">Who invented WhatsApp?</div>
+                            </div>
+                            
+                            <div class="demo-item">
+                                <div class="demo-meta">
+                                    <span class="dm-label"><i class="fa-solid fa-robot"></i> AI Response</span>
+                                    <span class="dm-status error-alert"><i class="fa-solid fa-triangle-exclamation"></i> Contradiction Found</span>
+                                </div>
+                                <div class="db-text text-red">WhatsApp was invented by Elon Musk in 2009.</div>
+                            </div>
+                            
+                            <div class="demo-analysis-box">
+                                <div class="dab-header">
+                                    <span class="dab-title"><i class="fa-solid fa-shield-halved"></i> Verification Engine</span>
+                                    <span class="dab-badge confidence-badge">98% Confidence</span>
+                                </div>
+                                <div class="dab-body">
+                                    <div class="evidence-block">
+                                        <span class="eb-label"><i class="fa-solid fa-book"></i> Reference Source</span>
+                                        <span class="eb-status-tag verified"><i class="fa-solid fa-check"></i> Verified Source</span>
+                                    </div>
+                                    <p class="db-src">Jan Koum and Brian Acton founded WhatsApp in 2009.</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+<!-- Interactive Hover Tooltip -->
+    <div id="truthlens-tooltip" class="tl-tooltip hidden">
+        <div class="tl-tooltip-header">
+            <span id="tt-type">Claim Type</span>
+            <span id="tt-status" class="tt-status-pill">Status</span>
+        </div>
+        <div class="tl-tooltip-meta">
+            <i class="fa-solid fa-bullseye"></i> Confidence: <span id="tt-conf">0%</span>
+        </div>
+        <div class="tl-tooltip-reason" id="tt-reason">
+            Reason details will appear here.
+        </div>
+    </div>
+
+    <script src="/static/app.js?v=11"></script>
+</body>
+
+</html>

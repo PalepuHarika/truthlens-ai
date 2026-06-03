@@ -1,0 +1,662 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TruthLens AI | Hallucination Detection</title>
+    <meta name="description"
+        content="TruthLens AI detects hallucinations in LLM outputs using NLI, HHEM, and semantic consistency scoring.">
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/static/style.css?v=10">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        /* High-Priority Theme Overrides */
+        body {
+            background: linear-gradient(135deg, #ffffff 0%, #f3f6fc 50%, #faf5ff 100%) !important;
+            background-attachment: fixed !important;
+        }
+
+        [data-theme="dark"] body {
+            background: linear-gradient(135deg, #0f172a 0%, #0c1527 50%, #171026 100%) !important;
+            background-attachment: fixed !important;
+            color: #f1f5f9 !important;
+        }
+
+        .view {
+            background: transparent !important;
+        }
+
+        [data-theme="dark"] .view {
+            background: transparent !important;
+        }
+
+        [data-theme="dark"] .settings-card,
+        [data-theme="dark"] .panel-card {
+            background: #1e293b !important;
+            border-color: rgba(255, 255, 255, 0.1) !important;
+            color: #f1f5f9 !important;
+        }
+
+        [data-theme="dark"] .navbar {
+            background: rgba(15, 23, 42, 0.9) !important;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1) !important;
+        }
+
+        [data-theme="dark"] .nav-link,
+        [data-theme="dark"] .page-title,
+        [data-theme="dark"] .sn {
+            color: #f1f5f9 !important;
+        }
+
+        /* Form Inputs Color Corrections */
+        .form-input {
+            color: #1e293b !important;
+            background-color: #ffffff !important;
+            border: 1px solid #cbd5e1 !important;
+            border-radius: 6px;
+            padding: 0.6rem 0.8rem;
+            font-size: 0.95rem;
+            outline: none;
+            transition: border-color 0.2s ease, box-shadow 0.2s ease;
+        }
+        .form-input:focus {
+            background-color: #ffffff !important;
+            border-color: var(--primary) !important;
+            box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.15) !important;
+        }
+        .form-input option {
+            color: #1e293b !important;
+            background-color: #ffffff !important;
+        }
+        .form-input::placeholder {
+            color: #64748b !important;
+            opacity: 0.8;
+        }
+
+        /* Dark Theme overrides for Contact Form */
+        [data-theme="dark"] .contact-form-container {
+            background: #1e293b !important;
+            border-color: rgba(255, 255, 255, 0.1) !important;
+        }
+        [data-theme="dark"] .form-input {
+            color: #f1f5f9 !important;
+            background-color: #0f172a !important;
+            border-color: rgba(255, 255, 255, 0.15) !important;
+        }
+        [data-theme="dark"] .form-input:focus {
+            background-color: #0f172a !important;
+            color: #f1f5f9 !important;
+        }
+        [data-theme="dark"] .form-input option {
+            color: #f1f5f9 !important;
+            background-color: #0f172a !important;
+        }
+
+
+
+        /* Smooth Transition */
+        body {
+            transition: background 0.3s ease, color 0.3s ease;
+        }
+
+        /* Dashboard Custom Grid & Table */
+        .dashboard-grid {
+            display: grid;
+            grid-template-columns: 2.2fr 1fr;
+            gap: 1.5rem;
+            margin-top: 1.5rem;
+            margin-bottom: 3rem;
+        }
+        @media (max-width: 992px) {
+            .dashboard-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+        .db-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.9rem;
+        }
+        .db-table th, .db-table td {
+            padding: 0.75rem 1rem;
+            text-align: left;
+            border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+        }
+        [data-theme="dark"] .db-table th, [data-theme="dark"] .db-table td {
+            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+        }
+        .db-table th {
+            font-weight: 600;
+            color: var(--text-dark);
+            background-color: rgba(0, 0, 0, 0.02);
+        }
+        [data-theme="dark"] .db-table th {
+            color: #f1f5f9;
+            background-color: rgba(255, 255, 255, 0.02);
+        }
+        .db-table tbody tr {
+            transition: background-color 0.2s ease;
+        }
+        .db-table tbody tr:hover {
+            background-color: rgba(0, 0, 0, 0.01);
+        }
+        [data-theme="dark"] .db-table tbody tr:hover {
+            background-color: rgba(255, 255, 255, 0.02);
+        }
+        .badge-verdict {
+            padding: 0.25rem 0.5rem;
+            border-radius: 6px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            display: inline-block;
+        }
+        .badge-verdict.high-trust {
+            background-color: #dcfce7 !important;
+            color: #14532d !important;
+        }
+        .badge-verdict.moderate-risk {
+            background-color: #fef3c7 !important;
+            color: #92400e !important;
+        }
+        .badge-verdict.high-risk {
+            background-color: #fee2e2 !important;
+            color: #991b1b !important;
+        }
+        .badge-verdict.severe-risk {
+            background-color: #fecaca !important;
+            color: #7f1d1d !important;
+        }
+        .risk-level-badge.severe {
+            background: #fecaca !important;
+            color: #7f1d1d !important;
+        }
+        [data-theme="dark"] .risk-level-badge.severe {
+            background: rgba(220, 38, 38, 0.2) !important;
+            color: #fca5a5 !important;
+        }
+        .quick-actions-list {
+            display: flex;
+            flex-direction: column;
+            gap: 0.75rem;
+            margin-top: 1rem;
+        }
+        .features-grid-2x2 {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 2rem;
+            margin-top: 3rem;
+            margin-bottom: 5rem;
+        }
+        @media (max-width: 768px) {
+            .features-grid-2x2 {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+    <script>
+        function setTheme(theme) {
+            console.log('Force applying theme:', theme);
+            document.documentElement.setAttribute('data-theme', theme);
+            localStorage.setItem('truthlens_theme', theme);
+
+            // Sync with existing buttons if they exist
+            const lightBtn = document.getElementById('theme-light-btn');
+            const darkBtn = document.getElementById('theme-dark-btn');
+            if (lightBtn && darkBtn) {
+                if (theme === 'dark') {
+                    darkBtn.classList.add('active');
+                    lightBtn.classList.remove('active');
+                } else {
+                    lightBtn.classList.add('active');
+                    darkBtn.classList.remove('active');
+                }
+            }
+        }
+        // Early load to prevent flicker
+        const saved = localStorage.getItem('truthlens_theme') || 'light';
+        document.documentElement.setAttribute('data-theme', saved);
+
+        // --- Chat File Logic ---
+        function triggerChatUpload() {
+            console.log('Triggering chat upload...');
+            document.getElementById('chat-file-input')?.click();
+        }
+
+        async function handleChatFileSelect(input) {
+            const file = input.files[0];
+            if (!file) return;
+
+            console.log('File selected:', file.name);
+            // We call the global app.js logic via a custom event or direct call
+            if (window.truthLens_handleFileUpload) {
+                window.truthLens_handleFileUpload(file);
+            } else {
+                console.error('App logic not loaded yet');
+            }
+        }
+    </script>
+    <link rel="icon" type="image/png" href="/static/favicon.png">
+</head>
+
+<body>
+
+
+    <nav class="navbar">
+        <div class="logo" onclick="navigateTo('home')" style="cursor: pointer;">
+            <i class="fa-solid fa-brain"></i>
+            <span>TruthLens <strong>AI</strong></span>
+        </div>
+                <div class="nav-links">
+            <a href="/" class="nav-link" data-view="home">Home</a>
+            <a href="/dashboard" class="nav-link" data-view="dashboard">Dashboard</a>
+            <a href="/chat" class="nav-link" data-view="chat">Chat</a>
+            <a href="/analysis" class="nav-link active" data-view="analysis">Analysis</a>
+            <a href="/features" class="nav-link" data-view="features">Features</a>
+            <a href="/contact" class="nav-link" data-view="contact">Contact</a>
+            <a href="/settings" class="nav-link" data-view="settings">Settings</a>
+            <a href="/login" class="nav-link" data-view="login" id="nav-login-btn">Login</a>
+            </div>
+        <button class="btn-primary btn-sm" id="new-analysis-btn">
+            <i class="fa-solid fa-wand-magic-sparkles"></i> New Analysis
+        </button>
+    </nav>
+
+    
+<div id="view-analysis" class="view active-view">
+        <div class="page-header">
+            <div>
+                <div class="page-title">TruthLens <span class="text-gradient">Analysis</span></div>
+                <div class="page-subtitle">Run deep hallucination analysis across all five signals</div>
+            </div>
+            <div class="status-pill"><span class="dot"></span> System Online</div>
+        </div>
+
+        <div class="db-layout">
+            <div class="db-left">
+                <div class="panel-card">
+                    <div class="panel-card-header">
+                        <i class="fa-solid fa-flask-vial text-purple"></i> Input Panel
+                    </div>
+                    <form id="db-eval-form">
+                        <div class="db-field">
+                            <label class="field-label"><i class="fa-solid fa-magnifying-glass"></i> Prompt</label>
+                            <input type="text" id="db-prompt" placeholder="Enter your query..." />
+                        </div>
+                        <!-- Response Mode Toggle -->
+                        <div class="response-mode-toggle" style="margin-bottom:0.75rem">
+                            <button type="button" class="mode-btn active" id="db-mode-own" onclick="setDbMode('own')">
+                                <i class="fa-solid fa-file-import"></i> Paste Response
+                            </button>
+                            <button type="button" class="mode-btn" id="db-mode-gen" onclick="setDbMode('generate')">
+                                <i class="fa-solid fa-wand-magic-sparkles"></i> AI Generate
+                            </button>
+                        </div>
+                        <!-- Own Response Panel -->
+                        <div id="db-own-panel">
+                            <div class="db-field">
+                                <label class="field-label"><i class="fa-regular fa-comment-dots"></i> AI
+                                    Response</label>
+                                <textarea id="db-response" rows="5"
+                                    placeholder="Paste the AI response to evaluate..."></textarea>
+                            </div>
+                        </div>
+                        <!-- Generate Panel -->
+                        <div id="db-gen-panel" class="hidden">
+                            <div class="response-mode-toggle" id="db-model-toggle" style="margin-bottom: 1rem;">
+                                <button type="button" class="mode-btn active" id="db-model-tiny"
+                                    onclick="setDbModel('tiny')">
+                                    <i class="fa-solid fa-bolt"></i> Standard (TinyLlama)
+                                </button>
+                                <button type="button" class="mode-btn" id="db-model-llama"
+                                    onclick="setDbModel('llama')">
+                                    <i class="fa-solid fa-brain"></i> Pro (Llama 3)
+                                </button>
+                            </div>
+                            <div class="gen-info-box" style="margin-bottom:0.75rem">
+                                <i class="fa-solid fa-robot"></i>
+                                <div>
+                                    <div class="gib-title" id="db-model-title">Standard Reasoning Engine</div>
+                                    <div class="gib-sub" id="db-model-desc">Generating factual responses via RAG +
+                                        TinyLlama.</div>
+                                </div>
+                            </div>
+                            <div class="gen-preview hidden" id="db-gen-preview">
+                                <div class="gp-label"><i class="fa-solid fa-robot"></i> Live Generated Output
+                                </div>
+                                <div class="gp-text" id="db-gen-text"
+                                    style="color: var(--text-dark); font-size: 0.95rem; line-height: 1.6;"></div>
+                            </div>
+                        </div>
+                        <div class="db-form-actions">
+                            <button type="submit" class="btn-primary" id="db-analyze-btn">
+                                <i class="fa-solid fa-wand-magic-sparkles"></i> Run Analysis
+                            </button>
+                            <button type="button" class="btn-secondary" id="db-compare-btn"
+                                style="border-color: var(--primary); color: var(--primary);">
+                                <i class="fa-solid fa-layer-group"></i> Multi-LLM
+                            </button>
+                            <button type="button" class="btn-secondary" id="db-example-btn">
+                                <i class="fa-solid fa-dice-d6"></i> Example
+                            </button>
+                        </div>
+                    </form>
+                </div>
+                <details class="signal-checklist" id="db-signal-checklist-own">
+                    <summary class="sc-title"
+                        style="cursor: pointer; outline: none; display: flex; justify-content: space-between; align-items: center; margin: 0;">
+                        <span>Active Signals</span>
+                        <i class="fa-solid fa-chevron-down" style="font-size: 0.8rem;"></i>
+                    </summary>
+                    <div style="margin-top: 1rem;">
+                        <div class="sc-item"><i class="fa-solid fa-circle-check text-teal"></i> NLI Contradiction</div>
+                        <div class="sc-item"><i class="fa-solid fa-circle-check text-purple"></i> HHEM Scoring</div>
+                        <div class="sc-item"><i class="fa-solid fa-circle-check text-green"></i> Consistency Check</div>
+                    </div>
+                </details>
+                <details class="signal-checklist hidden" id="db-signal-checklist-gen">
+                    <summary class="sc-title"
+                        style="cursor: pointer; outline: none; display: flex; justify-content: space-between; align-items: center; margin: 0;">
+                        <span>TruthLens Features</span>
+                        <i class="fa-solid fa-chevron-down" style="font-size: 0.8rem;"></i>
+                    </summary>
+                    <div style="margin-top: 1rem;">
+                        <div class="sc-item" style="white-space: nowrap; min-width: 110px;"><i
+                                class="fa-solid fa-circle-check text-blue"></i> Conversational Query
+                            Interface</div>
+                        <div class="sc-item"><i class="fa-solid fa-circle-check text-purple"></i> AI Response Generation
+                        </div>
+                        <div class="sc-item"><i class="fa-solid fa-circle-check text-teal"></i> Claim Extraction</div>
+                        <div class="sc-item"><i class="fa-solid fa-circle-check text-green"></i> Entity Validation</div>
+                        <div class="sc-item"><i class="fa-solid fa-circle-check text-orange"></i> Historical Fact
+                            Verification</div>
+                        <div class="sc-item"><i class="fa-solid fa-circle-check text-cyan"></i> Knowledge Graph
+                            Validation</div>
+                        <div class="sc-item"><i class="fa-solid fa-circle-check text-red"></i> Token‑Level Hallucination
+                            Detection</div>
+                        <div class="sc-item"><i class="fa-solid fa-circle-check text-yellow"></i> Hallucination Risk
+                            Score</div>
+                        <div class="sc-item"><i class="fa-solid fa-circle-check text-blue"></i> Visualization Dashboard
+                        </div>
+                        <div class="sc-item"><i class="fa-solid fa-circle-check text-indigo"></i> Evidence Source
+                            Display</div>
+                        <div class="sc-item"><i class="fa-solid fa-circle-check text-green"></i> Corrected Answer
+                            Generation</div>
+                    </div>
+                </details>
+            </div>
+
+            <div class="db-right">
+                <!-- Welcome Cover to cover the empty space -->
+                <div id="db-welcome-cover" class="db-welcome-cover">
+                    <img src="/static/brain.png?v=2" alt="TruthLens AI" class="welcome-hero-img" />
+                    <h2>Awaiting Analysis</h2>
+                    <p>Select your preferred mode on the left and run an analysis. The comprehensive hallucination
+                        metrics and pipeline features will populate this space.</p>
+                </div>
+
+                <div id="db-results-container" class="hidden">
+                    <div id="db-search-warning" class="hidden"
+                        style="background: #fffbeb; border: 1px solid #fef3c7; color: #92400e; padding: 1rem; border-radius: 12px; margin-bottom: 1.5rem; display: flex; align-items: center; gap: 1rem; font-size: 0.9rem;">
+                        <i class="fa-solid fa-triangle-exclamation" style="font-size: 1.2rem;"></i>
+                        <div>
+                            <strong>Search Signal Unavailable:</strong> DuckDuckGo rate-limited our factual retrieval.
+                            Hallucination detection is currently limited to cross-model consistency.
+                        </div>
+                    </div>
+                    <div class="score-row hidden" id="db-score-row">
+                        <div class="score-card">
+                            <div class="sc-icon" id="db-risk-icon-wrap"><i class="fa-solid fa-shield-halved"></i></div>
+                            <div>
+                                <div class="sc-label">Overall Risk</div>
+                                <div class="sc-val" id="db-overall-risk">--</div>
+                                <div class="sc-sub" id="db-risk-sub">Awaiting analysis</div>
+                            </div>
+                        </div>
+                        <div class="score-card">
+                            <div class="sc-icon"><i class="fa-solid fa-wave-square text-blue"></i></div>
+                            <div>
+                                <div class="sc-label">Hallucination Score</div>
+                                <div class="sc-val" id="db-hallu-score">--</div>
+                                <div class="sc-sub">Normalized 0–100%</div>
+                            </div>
+                        </div>
+                        <div class="score-card">
+                            <div class="sc-icon"><i class="fa-solid fa-check-double text-green"></i></div>
+                            <div>
+                                <div class="sc-label">Consistency</div>
+                                <div class="sc-val" id="db-consistency-val">--</div>
+                                <div class="sc-sub">Response coherence</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Explanation Layer -->
+                    <div class="panel-card hidden" id="db-explanation-card"
+                        style="border-left: 4px solid #ef4444; background: #fff1f2;">
+                        <div class="panel-card-header" style="color: #b91c1c;">
+                            <i class="fa-solid fa-triangle-exclamation"></i> Hallucination Explanation
+                        </div>
+                        <div class="explanation-content" style="padding: 1rem; font-size: 0.95rem;">
+                            <div style="margin-bottom: 0.75rem;">
+                                <strong style="color:#991b1b;"><i class="fa-solid fa-quote-left"></i> Flagged
+                                    Sentence:</strong>
+                                <div id="exp-flagged"
+                                    style="margin-top: 0.25rem; font-style: italic; background: #fee2e2; padding: 0.5rem; border-radius: 4px; color: #7f1d1d;">
+                                    --</div>
+                            </div>
+                            <div style="margin-bottom: 0.75rem;">
+                                <strong style="color:#b45309;"><i class="fa-solid fa-circle-question"></i> Why it's
+                                    flagged:</strong>
+                                <div id="exp-reason" style="margin-top: 0.25rem; color: #92400e;">--</div>
+                            </div>
+                            <div>
+                                <strong style="color:#166534;"><i class="fa-solid fa-check-double"></i> Grounded
+                                    Correction:</strong>
+                                <div id="exp-correction"
+                                    style="margin-top: 0.25rem; background: #dcfce7; padding: 0.5rem; border-radius: 4px; color: #14532d;">
+                                    --</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="panel-card" id="db-metric-card">
+                        <div class="panel-card-header">
+                            <i class="fa-solid fa-chart-bar text-blue"></i> Metric Breakdown
+                        </div>
+                        <div id="db-empty-state" class="empty-state">
+                            <i class="fa-solid fa-chart-simple"></i>
+                            <p>Run an analysis to view detailed metrics</p>
+                        </div>
+                        <div id="db-metric-bars" class="metric-bar-list hidden"></div>
+                    </div>
+
+                    <div class="panel-card" id="db-details-card">
+                        <div class="panel-card-header">
+                            <i class="fa-solid fa-list-check text-purple"></i> Diagnostic Details
+                        </div>
+                        <ul class="db-details-list" id="db-details-list">
+                            <li class="placeholder-li">No analysis run yet.</li>
+                        </ul>
+                    </div>
+
+                    <!-- ── FR-02 / FR-23: Safety Filter + Pipeline Status ── -->
+                    <div class="fr-section hidden" id="fr-pipeline-section">
+                        <div class="fr-section-inner">
+                            <div class="safety-badge" id="fr-safety-badge">
+                                <i class="fa-solid fa-shield-check"></i>
+                                <span id="fr-safety-label">Safety Filter: Checking…</span>
+                            </div>
+                            <div class="pipeline-steps" id="fr-pipeline-steps">
+                                <div class="pip-step done" data-step="Input"><i
+                                        class="fa-solid fa-keyboard"></i><span>Input</span></div>
+                                <div class="pip-arrow"><i class="fa-solid fa-chevron-right"></i></div>
+                                <div class="pip-step done" data-step="Safety"><i
+                                        class="fa-solid fa-shield-halved"></i><span>Safety Filter</span></div>
+                                <div class="pip-arrow"><i class="fa-solid fa-chevron-right"></i></div>
+                                <div class="pip-step done" data-step="LLM"><i class="fa-solid fa-brain"></i><span>LLM
+                                        Response</span></div>
+                                <div class="pip-arrow"><i class="fa-solid fa-chevron-right"></i></div>
+                                <div class="pip-step done" data-step="Claims"><i
+                                        class="fa-solid fa-list-ul"></i><span>Claim Extraction</span></div>
+                                <div class="pip-arrow"><i class="fa-solid fa-chevron-right"></i></div>
+                                <div class="pip-step done" data-step="Entities"><i
+                                        class="fa-solid fa-tag"></i><span>Entity Check</span></div>
+                                <div class="pip-arrow"><i class="fa-solid fa-chevron-right"></i></div>
+                                <div class="pip-step done" data-step="History"><i
+                                        class="fa-solid fa-landmark"></i><span>Fact Verification</span></div>
+                                <div class="pip-arrow"><i class="fa-solid fa-chevron-right"></i></div>
+                                <div class="pip-step done" data-step="KG"><i
+                                        class="fa-solid fa-diagram-project"></i><span>Knowledge Graph</span></div>
+                                <div class="pip-arrow"><i class="fa-solid fa-chevron-right"></i></div>
+                                <div class="pip-step done" data-step="Evidence"><i
+                                        class="fa-solid fa-book-open"></i><span>Evidence</span></div>
+                                <div class="pip-arrow"><i class="fa-solid fa-chevron-right"></i></div>
+                                <div class="pip-step done" data-step="Score"><i
+                                        class="fa-solid fa-star-half-stroke"></i><span>Risk Score</span></div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- ── FR-05 / FR-06 / FR-07 / FR-14 / FR-16 / FR-17: Claims + Heatmap ── -->
+                    <div class="fr-two-col hidden" id="fr-claims-heatmap">
+                        <div class="panel-card fr-panel-card">
+                            <div class="panel-card-header">
+                                <i class="fa-solid fa-list-check text-blue"></i> Claim Verification Panel
+                                <span class="panel-badge" id="fr-claims-count">0 claims</span>
+                            </div>
+                            <div id="fr-claims-list" class="claims-list"></div>
+                        </div>
+                        <div class="panel-card fr-panel-card">
+                            <div class="panel-card-header">
+                                <i class="fa-solid fa-highlighter text-orange"></i> Claim Analysis Heatmap
+                            </div>
+                            <p class="heatmap-legend">
+                                <span class="hl-dot verified"></span>Verified &nbsp;
+                                <span class="hl-dot partial"></span>Partial &nbsp;
+                                <span class="hl-dot weak"></span>Weak &nbsp;
+                                <span class="hl-dot contradicted"></span>Contradicted &nbsp;
+                                <span class="hl-dot fabricated"></span>Fabricated
+                            </p>
+                            <div id="fr-heatmap" class="heatmap-text"></div>
+                        </div>
+                    </div>
+
+                    <!-- ── FR-04 / FR-19 / FR-20: Original vs Corrected Comparison ── -->
+                    <div class="fr-section hidden" id="fr-comparison-section">
+                        <div class="panel-card fr-panel-card">
+                            <div class="panel-card-header">
+                                <i class="fa-solid fa-code-compare text-teal"></i> Response Comparison
+                                <span class="panel-badge">FR-19 · FR-20</span>
+                            </div>
+                            <div class="comparison-grid">
+                                <div class="comp-col original">
+                                    <div class="comp-label"><i class="fa-solid fa-circle-xmark text-orange"></i>
+                                        Original Response
+                                        (Stored)</div>
+                                    <div class="comp-body" id="fr-original-text"></div>
+                                </div>
+                                <div class="comp-divider"><i class="fa-solid fa-arrow-right-arrow-left"></i></div>
+                                <div class="comp-col corrected">
+                                    <div class="comp-label"><i class="fa-solid fa-circle-check text-green"></i>
+                                        Corrected Verified
+                                        Answer</div>
+                                    <div class="comp-body" id="fr-corrected-text"></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- ── NEW FEATURE: Multi-LLM Comparison + Disagreement Detection ── -->
+                    <div class="fr-section hidden" id="fr-compare-section">
+                        <div class="panel-card fr-panel-card">
+                            <div class="panel-card-header">
+                                <i class="fa-solid fa-layer-group text-purple"></i> Multi-LLM Cross-Check Comparison
+                                <span class="panel-badge">PREMIUM</span>
+                            </div>
+                            <div class="llm-comparison-grid" id="fr-compare-grid">
+                                <!-- Dynamic LLM cards will be injected here -->
+                            </div>
+
+                            <div class="disagreement-overlay" id="fr-disagreement-box">
+                                <div class="overlay-header">
+                                    <i class="fa-solid fa-triangle-exclamation text-orange"></i>
+                                    Disagreements & Unstable Facts Detected
+                                </div>
+                                <div id="fr-disagreement-list" class="disagreement-list">
+                                    <!-- Disagreements will be listed here -->
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- ── NEW FEATURE: Visual Document RAG Viewer ── -->
+                    <div class="fr-section hidden" id="fr-rag-section">
+                        <div class="panel-card fr-panel-card" style="border-left: 4px solid var(--secondary); background: rgba(14, 165, 233, 0.03);">
+                            <div class="panel-card-header">
+                                <i class="fa-solid fa-file-invoice text-blue"></i> Visual Document RAG Viewer
+                                <span class="panel-badge" id="fr-rag-count">0 chunks retrieved</span>
+                            </div>
+                            <p class="section-desc" style="padding: 0 1rem; font-size: 0.85rem; color: var(--text-muted); margin-bottom: 1rem;">
+                                Below are the raw document chunks retrieved from the FAISS vector store index that were used to verify and ground the AI response.
+                            </p>
+                            <div id="fr-rag-list" class="rag-list" style="display: flex; flex-direction: column; gap: 1rem; padding: 0 1rem 1rem 1rem;">
+                                <!-- Dynamic RAG chunks will be injected here -->
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- ── FR-11 / FR-18 / FR-21 / FR-22: Evidence Sources ── -->
+                    <div class="fr-section hidden" id="fr-evidence-section">
+                        <div class="panel-card fr-panel-card">
+                            <div class="panel-card-header">
+                                <i class="fa-solid fa-book-open text-blue"></i> Evidence Sources
+                            </div>
+                            <div id="fr-evidence-list" class="evidence-list"></div>
+                        </div>
+                    </div>
+                </div> <!-- End db-results-container -->
+            </div>
+        </div>
+        <!-- All FR sections have been moved inside db-results-container -->
+    </div>
+<!-- Interactive Hover Tooltip -->
+    <div id="truthlens-tooltip" class="tl-tooltip hidden">
+        <div class="tl-tooltip-header">
+            <span id="tt-type">Claim Type</span>
+            <span id="tt-status" class="tt-status-pill">Status</span>
+        </div>
+        <div class="tl-tooltip-meta">
+            <i class="fa-solid fa-bullseye"></i> Confidence: <span id="tt-conf">0%</span>
+        </div>
+        <div class="tl-tooltip-reason" id="tt-reason">
+            Reason details will appear here.
+        </div>
+    </div>
+
+        <!-- 6. Footer -->
+    <footer class="main-footer">
+        <div class="footer-content">
+            <div class="footer-logo">
+                <i class="fa-solid fa-brain"></i> TruthLens <strong>AI</strong>
+            </div>
+            <div class="footer-links">
+                <a href="/">Home</a>
+                <a href="/dashboard">Dashboard</a>
+                <a href="/chat">Chat</a>
+                <a href="/about">About</a>
+                <a href="/contact">Contact</a>
+                <a href="/settings">Settings</a>
+            </div>
+            
+            <div class="footer-copy">
+                &copy; 2026 TruthLens AI Research Project. All rights reserved.
+            </div>
+        </div>
+    </footer>
+
+    <script src="/static/app.js?v=11"></script>
+</body>
+
+</html>

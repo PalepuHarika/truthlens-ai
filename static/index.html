@@ -1,0 +1,413 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TruthLens AI | Hallucination Detection</title>
+    <meta name="description"
+        content="TruthLens AI detects hallucinations in LLM outputs using NLI, HHEM, and semantic consistency scoring.">
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/static/style.css?v=10">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        /* High-Priority Theme Overrides */
+        body {
+            background: linear-gradient(135deg, #ffffff 0%, #f3f6fc 50%, #faf5ff 100%) !important;
+            background-attachment: fixed !important;
+        }
+
+        [data-theme="dark"] body {
+            background: linear-gradient(135deg, #0f172a 0%, #0c1527 50%, #171026 100%) !important;
+            background-attachment: fixed !important;
+            color: #f1f5f9 !important;
+        }
+
+        .view {
+            background: transparent !important;
+        }
+
+        [data-theme="dark"] .view {
+            background: transparent !important;
+        }
+
+        [data-theme="dark"] .settings-card,
+        [data-theme="dark"] .panel-card {
+            background: #1e293b !important;
+            border-color: rgba(255, 255, 255, 0.1) !important;
+            color: #f1f5f9 !important;
+        }
+
+        [data-theme="dark"] .navbar {
+            background: rgba(15, 23, 42, 0.9) !important;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1) !important;
+        }
+
+        [data-theme="dark"] .nav-link,
+        [data-theme="dark"] .page-title,
+        [data-theme="dark"] .sn {
+            color: #f1f5f9 !important;
+        }
+
+        /* Form Inputs Color Corrections */
+        .form-input {
+            color: #1e293b !important;
+            background-color: #ffffff !important;
+            border: 1px solid #cbd5e1 !important;
+            border-radius: 6px;
+            padding: 0.6rem 0.8rem;
+            font-size: 0.95rem;
+            outline: none;
+            transition: border-color 0.2s ease, box-shadow 0.2s ease;
+        }
+        .form-input:focus {
+            background-color: #ffffff !important;
+            border-color: var(--primary) !important;
+            box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.15) !important;
+        }
+        .form-input option {
+            color: #1e293b !important;
+            background-color: #ffffff !important;
+        }
+        .form-input::placeholder {
+            color: #64748b !important;
+            opacity: 0.8;
+        }
+
+        /* Dark Theme overrides for Contact Form */
+        [data-theme="dark"] .contact-form-container {
+            background: #1e293b !important;
+            border-color: rgba(255, 255, 255, 0.1) !important;
+        }
+        [data-theme="dark"] .form-input {
+            color: #f1f5f9 !important;
+            background-color: #0f172a !important;
+            border-color: rgba(255, 255, 255, 0.15) !important;
+        }
+        [data-theme="dark"] .form-input:focus {
+            background-color: #0f172a !important;
+            color: #f1f5f9 !important;
+        }
+        [data-theme="dark"] .form-input option {
+            color: #f1f5f9 !important;
+            background-color: #0f172a !important;
+        }
+
+
+
+        /* Smooth Transition */
+        body {
+            transition: background 0.3s ease, color 0.3s ease;
+        }
+    </style>
+    <script>
+        function setTheme(theme) {
+            console.log('Force applying theme:', theme);
+            document.documentElement.setAttribute('data-theme', theme);
+            localStorage.setItem('truthlens_theme', theme);
+
+            // Sync with existing buttons if they exist
+            const lightBtn = document.getElementById('theme-light-btn');
+            const darkBtn = document.getElementById('theme-dark-btn');
+            if (lightBtn && darkBtn) {
+                if (theme === 'dark') {
+                    darkBtn.classList.add('active');
+                    lightBtn.classList.remove('active');
+                } else {
+                    lightBtn.classList.add('active');
+                    darkBtn.classList.remove('active');
+                }
+            }
+        }
+        // Early load to prevent flicker
+        const saved = localStorage.getItem('truthlens_theme') || 'light';
+        document.documentElement.setAttribute('data-theme', saved);
+
+        // --- Chat File Logic ---
+        function triggerChatUpload() {
+            console.log('Triggering chat upload...');
+            document.getElementById('chat-file-input')?.click();
+        }
+
+        async function handleChatFileSelect(input) {
+            const file = input.files[0];
+            if (!file) return;
+
+            console.log('File selected:', file.name);
+            // We call the global app.js logic via a custom event or direct call
+            if (window.truthLens_handleFileUpload) {
+                window.truthLens_handleFileUpload(file);
+            } else {
+                console.error('App logic not loaded yet');
+            }
+        }
+    </script>
+</head>
+
+<body>
+    <div class="background-blobs">
+        <div class="blob b1"></div>
+        <div class="blob b2"></div>
+        <div class="blob b3"></div>
+    </div>
+
+    <nav class="navbar">
+        <div class="logo">
+            <i class="fa-solid fa-brain"></i>
+            <span>TruthLens <strong>AI</strong></span>
+        </div>
+                <div class="nav-links">
+            <a href="/" class="nav-link active" data-view="home">Home</a>
+            <a href="/dashboard" class="nav-link" data-view="dashboard">Dashboard</a>
+            <a href="/chat" class="nav-link" data-view="chat">Chat</a>
+            <a href="/analysis" class="nav-link" data-view="analysis">Analysis</a>
+            <a href="/features" class="nav-link" data-view="features">Features</a>
+            <a href="/contact" class="nav-link" data-view="contact">Contact</a>
+            <a href="/settings" class="nav-link" data-view="settings">Settings</a>
+            <a href="/login" class="nav-link" data-view="login" id="nav-login-btn">Login</a>
+            </div>
+        <button class="btn-primary btn-sm" id="new-analysis-btn">
+            <i class="fa-solid fa-wand-magic-sparkles"></i> New Analysis
+        </button>
+    </nav>
+
+    
+<div id="view-home" class="view active-view">
+        <!-- 1. Hero Section -->
+        <section class="hero-section">
+            <div class="hero-container content-container">
+                <div class="hero-text-col">
+                    <div class="hero-badge">
+                        <i class="fa-solid fa-sparkles"></i> The New Standard in AI Reliability
+                    </div>
+                    <h1>Detect <span class="text-gradient">Hallucinations</span><br>with Mathematical Certainty</h1>
+                    <p class="hero-subtitle">TruthLens AI identifies factual inconsistencies and logical fallacies in LLM outputs using state-of-the-art NLI and grounding pipelines.</p>
+                    <div class="hero-actions">
+                        <button class="btn-primary btn-lg" id="hero-get-started" onclick="location.href='/login'">
+                            <i class="fa-solid fa-user-plus"></i> Get Started Free
+                        </button>
+                        <button class="btn-secondary btn-lg" id="hero-login" onclick="location.href='/login'">
+                            <i class="fa-solid fa-right-to-bracket"></i> Login
+                        </button>
+                        <button class="btn-secondary btn-lg" id="hero-demo-scroll" onclick="document.getElementById('demo-section').scrollIntoView({behavior: 'smooth'})">
+                            <i class="fa-solid fa-vial"></i> Try Live Demo
+                        </button>
+                    </div>
+                    <div class="hero-trust-indicators">
+                        <span class="trust-item"><i class="fa-solid fa-check"></i> Real-time verification</span>
+                        <span class="trust-item"><i class="fa-solid fa-check"></i> Multi-LLM support</span>
+                        <span class="trust-item"><i class="fa-solid fa-check"></i> Contradiction detection</span>
+                    </div>
+                </div>
+                <div class="hero-visual-col">
+                    <div class="hero-mockup-wrapper">
+                        <img src="/static/truthlens_hero_mockup.png" alt="TruthLens Dashboard Mockup" class="mockup-img">
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- 3. How It Works (Clean Version) -->
+        <section class="workflow-section">
+            <div class="content-container">
+                <div class="section-label"><span class="line"></span> How It Works <span class="line"></span></div>
+                <div class="workflow-steps">
+                    <div class="ws-item">
+                        <div class="ws-icon"><i class="fa-solid fa-i-cursor"></i></div>
+                        <h4>Prompt</h4>
+                    </div>
+                    <div class="ws-connector"></div>
+                    <div class="ws-item">
+                        <div class="ws-icon"><i class="fa-solid fa-scissors"></i></div>
+                        <h4>Extract</h4>
+                    </div>
+                    <div class="ws-connector"></div>
+                    <div class="ws-item">
+                        <div class="ws-icon"><i class="fa-solid fa-globe"></i></div>
+                        <h4>Ground</h4>
+                    </div>
+                    <div class="ws-connector"></div>
+                    <div class="ws-item">
+                        <div class="ws-icon"><i class="fa-solid fa-gauge-high"></i></div>
+                        <h4>Score</h4>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- 5. Testimonials & Stats -->
+        <section class="stats-section">
+            <div class="stats-grid">
+                <div class="stat-item">
+                    <div class="stat-num">98%</div>
+                    <div class="stat-label">Detection Accuracy</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-num">4+</div>
+                    <div class="stat-label">Model Integrations</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-num">200ms</div>
+                    <div class="stat-label">Inference Latency</div>
+                </div>
+            </div>
+        </section>
+
+        <!-- 4. Interactive Demo (Existing Analysis Form) -->
+        <section id="demo-section" class="demo-section">
+            <div class="content-container">
+                <div class="section-label"><span class="line"></span> Interactive Demo <span class="line"></span></div>
+                <div class="main-container">
+                    <div class="left-col">
+                        <h2>Test our <span class="text-gradient">Diagnostic Engine</span></h2>
+                        <p class="subtitle">Enter a query below to see how TruthLens identifies hallucinations in
+                            real-time.</p>
+                        <form id="eval-form" class="input-section">
+                            <div class="search-bar">
+                                <i class="fa-solid fa-magnifying-glass search-icon"></i>
+                                <input type="text" id="prompt" required
+                                    placeholder="Ask a factual question (e.g., 'Who won the 2023 World Cup?')" />
+                            </div>
+
+                            <div class="response-mode-toggle" id="home-mode-toggle">
+                                <button type="button" class="mode-btn active" id="home-mode-own"
+                                    onclick="setHomeMode('own')">
+                                    <i class="fa-solid fa-file-import"></i> Paste Response
+                                </button>
+                                <button type="button" class="mode-btn" id="home-mode-gen"
+                                    onclick="setHomeMode('generate')">
+                                    <i class="fa-solid fa-wand-magic-sparkles"></i> AI Generate
+                                </button>
+                            </div>
+
+                            <div id="home-own-panel">
+                                <div class="response-bar">
+                                    <i class="fa-regular fa-message search-icon"></i>
+                                    <textarea id="response"
+                                        placeholder="Paste the AI's response here to verify its claims..."></textarea>
+                                </div>
+                            </div>
+
+                            <div id="home-gen-panel" class="hidden">
+                                <div class="response-mode-toggle" id="home-model-toggle" style="margin-bottom: 1.5rem;">
+                                    <button type="button" class="mode-btn active" id="model-tiny"
+                                        onclick="setHomeModel('tiny')">
+                                        <i class="fa-solid fa-bolt"></i> Standard (TinyLlama)
+                                    </button>
+                                    <button type="button" class="mode-btn" id="model-llama"
+                                        onclick="setHomeModel('llama')">
+                                        <i class="fa-solid fa-brain"></i> Pro (Llama 3)
+                                    </button>
+                                </div>
+                                <div class="gen-info-box">
+                                    <div class="gib-icon"><i class="fa-solid fa-microchip"></i></div>
+                                    <div>
+                                        <div class="gib-title">TruthLens Reasoning Engine</div>
+                                        <div class="gib-sub" id="home-model-desc">Using RAG + TinyLlama (1.1B) for
+                                            optimized speed.</div>
+                                    </div>
+                                </div>
+                                <div class="gen-preview hidden" id="home-gen-preview">
+                                    <div class="gp-label"><i class="fa-solid fa-robot"></i> Live Generated Output</div>
+                                    <div id="home-gen-text"></div>
+                                </div>
+                            </div>
+
+                            <div class="action-buttons">
+                                <button type="submit" class="btn-primary" id="analyze-btn" style="flex: 1.5;">
+                                    <i class="fa-solid fa-bolt"></i> Run Analysis
+                                </button>
+                                <button type="button" class="btn-secondary" id="compare-btn"
+                                    style="flex: 1; border-color: var(--primary); color: var(--primary);">
+                                    <i class="fa-solid fa-layer-group"></i> Multi-LLM
+                                </button>
+                                <button type="button" class="btn-secondary" id="example-btn"
+                                    style="padding: 0.8rem 1.2rem;">
+                                    <i class="fa-solid fa-lightbulb"></i>
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                    <div class="right-col">
+                        <div class="live-demo-panel">
+                            <div class="panel-top">
+                                <div class="dot-indicator"><span class="dot"></span> Live Analysis</div>
+                                <div class="badge">Results</div>
+                            </div>
+                            <div class="query-box">
+                                <i class="fa-solid fa-magnifying-glass"></i>
+                                <span id="demo-query-text">Waiting for input...</span>
+                            </div>
+                            <div class="metrics-grid">
+                                <div class="metric-card">
+                                    <div class="mc-title">Hallucination Score</div>
+                                    <div class="mc-val risk-value" id="hallucination-text">0%</div>
+                                </div>
+                                <div class="metric-card">
+                                    <div class="mc-title">Consistency</div>
+                                    <div class="mc-val" id="consistency-text">0%</div>
+                                </div>
+                            </div>
+                            <div class="detailed-breakdown">
+                                <h4>Pipeline Details</h4>
+                                <ul id="details-list">
+                                    <li>Run an analysis to see metrics.</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+        </section>
+
+
+        <!-- 6. Footer -->
+        <footer class="main-footer">
+            <div class="footer-content">
+                <div class="footer-logo">
+                    <i class="fa-solid fa-brain"></i> TruthLens AI
+                </div>
+                <div class="footer-links">
+                    <a href="#" onclick="navigateTo('home')">Home</a>
+                    <a href="#" onclick="navigateTo('about')">About</a>
+                    <a href="#" onclick="navigateTo('contact')">Feedback</a>
+                    <a href="#" onclick="navigateTo('login')">Sign In</a>
+                </div>
+                <div class="footer-copy">
+                    &copy; 2026 TruthLens AI Research. All rights reserved.
+                </div>
+            </div>
+        </footer>
+    </div>
+
+    <!-- Interactive Hover Tooltip -->
+    <div id="truthlens-tooltip" class="tl-tooltip hidden">
+        <div class="tl-tooltip-header">
+            <span id="tt-type">Claim Type</span>
+            <span id="tt-status" class="tt-status-pill">Status</span>
+        </div>
+        <div class="tl-tooltip-meta">
+            <i class="fa-solid fa-bullseye"></i> Confidence: <span id="tt-conf">0%</span>
+        </div>
+        <div class="tl-tooltip-reason" id="tt-reason">
+            Reason details will appear here.
+        </div>
+    </div>
+<!-- Interactive Hover Tooltip -->
+    <div id="truthlens-tooltip" class="tl-tooltip hidden">
+        <div class="tl-tooltip-header">
+            <span id="tt-type">Claim Type</span>
+            <span id="tt-status" class="tt-status-pill">Status</span>
+        </div>
+        <div class="tl-tooltip-meta">
+            <i class="fa-solid fa-bullseye"></i> Confidence: <span id="tt-conf">0%</span>
+        </div>
+        <div class="tl-tooltip-reason" id="tt-reason">
+            Reason details will appear here.
+        </div>
+    </div>
+
+    <script src="/static/app.js?v=11"></script>
+</body>
+
+</html>

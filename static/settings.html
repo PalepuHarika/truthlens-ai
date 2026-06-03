@@ -1,0 +1,365 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TruthLens AI | Hallucination Detection</title>
+    <meta name="description"
+        content="TruthLens AI detects hallucinations in LLM outputs using NLI, HHEM, and semantic consistency scoring.">
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/static/style.css?v=10">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        /* High-Priority Theme Overrides */
+        body {
+            background: linear-gradient(135deg, #ffffff 0%, #f3f6fc 50%, #faf5ff 100%) !important;
+            background-attachment: fixed !important;
+        }
+
+        [data-theme="dark"] body {
+            background: linear-gradient(135deg, #0f172a 0%, #0c1527 50%, #171026 100%) !important;
+            background-attachment: fixed !important;
+            color: #f1f5f9 !important;
+        }
+
+        .view {
+            background: transparent !important;
+        }
+
+        [data-theme="dark"] .view {
+            background: transparent !important;
+        }
+
+        [data-theme="dark"] .settings-card,
+        [data-theme="dark"] .panel-card {
+            background: #1e293b !important;
+            border-color: rgba(255, 255, 255, 0.1) !important;
+            color: #f1f5f9 !important;
+        }
+
+        [data-theme="dark"] .navbar {
+            background: rgba(15, 23, 42, 0.9) !important;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1) !important;
+        }
+
+        [data-theme="dark"] .nav-link,
+        [data-theme="dark"] .page-title,
+        [data-theme="dark"] .sn {
+            color: #f1f5f9 !important;
+        }
+
+        /* Form Inputs Color Corrections */
+        .form-input {
+            color: #1e293b !important;
+            background-color: #ffffff !important;
+            border: 1px solid #cbd5e1 !important;
+            border-radius: 6px;
+            padding: 0.6rem 0.8rem;
+            font-size: 0.95rem;
+            outline: none;
+            transition: border-color 0.2s ease, box-shadow 0.2s ease;
+        }
+        .form-input:focus {
+            background-color: #ffffff !important;
+            border-color: var(--primary) !important;
+            box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.15) !important;
+        }
+        .form-input option {
+            color: #1e293b !important;
+            background-color: #ffffff !important;
+        }
+        .form-input::placeholder {
+            color: #64748b !important;
+            opacity: 0.8;
+        }
+
+        /* Dark Theme overrides for Contact Form */
+        [data-theme="dark"] .contact-form-container {
+            background: #1e293b !important;
+            border-color: rgba(255, 255, 255, 0.1) !important;
+        }
+        [data-theme="dark"] .form-input {
+            color: #f1f5f9 !important;
+            background-color: #0f172a !important;
+            border-color: rgba(255, 255, 255, 0.15) !important;
+        }
+        [data-theme="dark"] .form-input:focus {
+            background-color: #0f172a !important;
+            color: #f1f5f9 !important;
+        }
+        [data-theme="dark"] .form-input option {
+            color: #f1f5f9 !important;
+            background-color: #0f172a !important;
+        }
+
+
+
+        /* Smooth Transition */
+        body {
+            transition: background 0.3s ease, color 0.3s ease;
+        }
+    </style>
+    <script>
+        function setTheme(theme) {
+            console.log('Force applying theme:', theme);
+            document.documentElement.setAttribute('data-theme', theme);
+            localStorage.setItem('truthlens_theme', theme);
+
+            // Sync with existing buttons if they exist
+            const lightBtn = document.getElementById('theme-light-btn');
+            const darkBtn = document.getElementById('theme-dark-btn');
+            if (lightBtn && darkBtn) {
+                if (theme === 'dark') {
+                    darkBtn.classList.add('active');
+                    lightBtn.classList.remove('active');
+                } else {
+                    lightBtn.classList.add('active');
+                    darkBtn.classList.remove('active');
+                }
+            }
+        }
+        // Early load to prevent flicker
+        const saved = localStorage.getItem('truthlens_theme') || 'light';
+        document.documentElement.setAttribute('data-theme', saved);
+
+        // --- Chat File Logic ---
+        function triggerChatUpload() {
+            console.log('Triggering chat upload...');
+            document.getElementById('chat-file-input')?.click();
+        }
+
+        async function handleChatFileSelect(input) {
+            const file = input.files[0];
+            if (!file) return;
+
+            console.log('File selected:', file.name);
+            // We call the global app.js logic via a custom event or direct call
+            if (window.truthLens_handleFileUpload) {
+                window.truthLens_handleFileUpload(file);
+            } else {
+                console.error('App logic not loaded yet');
+            }
+        }
+    </script>
+</head>
+
+<body>
+    <div class="background-blobs">
+        <div class="blob b1"></div>
+        <div class="blob b2"></div>
+        <div class="blob b3"></div>
+    </div>
+
+    <nav class="navbar">
+        <div class="logo">
+            <i class="fa-solid fa-brain"></i>
+            <span>TruthLens <strong>AI</strong></span>
+        </div>
+                <div class="nav-links">
+            <a href="/" class="nav-link" data-view="home">Home</a>
+            <a href="/dashboard" class="nav-link" data-view="dashboard">Dashboard</a>
+            <a href="/chat" class="nav-link" data-view="chat">Chat</a>
+            <a href="/analysis" class="nav-link" data-view="analysis">Analysis</a>
+            <a href="/features" class="nav-link" data-view="features">Features</a>
+            <a href="/contact" class="nav-link" data-view="contact">Contact</a>
+            <a href="/settings" class="nav-link active" data-view="settings">Settings</a>
+            <a href="/login" class="nav-link" data-view="login" id="nav-login-btn">Login</a>
+            </div>
+        <button class="btn-primary btn-sm" id="new-analysis-btn">
+            <i class="fa-solid fa-wand-magic-sparkles"></i> New Analysis
+        </button>
+    </nav>
+
+    
+<div id="view-settings" class="view active-view">
+        <div class="page-header">
+            <div>
+                <div class="page-title"><i class="fa-solid fa-gear text-purple"></i> Settings</div>
+                <div class="page-subtitle">Configure analysis parameters and preferences</div>
+            </div>
+        </div>
+
+        <div class="settings-layout">
+            <div class="settings-group">
+                <div class="sg-title"><i class="fa-solid fa-microchip text-purple"></i> Model Configuration</div>
+                <div class="settings-card">
+                    <div class="setting-row">
+                        <div class="setting-info">
+                            <div class="sn">Evaluation Mode</div>
+                            <div class="sd">Use mock responses or real model inference</div>
+                        </div>
+                        <select class="setting-select" id="setting-mode">
+                            <option value="mock" selected>Mock Mode (Fast)</option>
+                            <option value="real">Real Inference</option>
+                        </select>
+                    </div>
+                    <div class="setting-row">
+                        <div class="setting-info">
+                            <div class="sn">NLI Model</div>
+                            <div class="sd">Model used for contradiction detection</div>
+                        </div>
+                        <select class="setting-select" id="setting-nli">
+                            <option>cross-encoder/nli-deberta-v3-small</option>
+                            <option>facebook/bart-large-mnli</option>
+                            <option>roberta-large-mnli</option>
+                        </select>
+                    </div>
+                    <div class="setting-row">
+                        <div class="setting-info">
+                            <div class="sn">HHEM Model</div>
+                            <div class="sd">Hallucination evaluation model</div>
+                        </div>
+                        <select class="setting-select" id="setting-hhem-model">
+                            <option>vectara/hallucination_evaluation_model</option>
+                            <option>vectara/hhem-2.1-open</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+
+            <div class="settings-group">
+                <div class="sg-title"><i class="fa-solid fa-palette text-blue"></i> Appearance & Theme</div>
+                <div class="settings-card">
+                    <div class="setting-row">
+                        <div class="setting-info">
+                            <div class="sn">Interface Theme</div>
+                            <div class="sd">Select between light and dark interface modes</div>
+                        </div>
+                        <div class="theme-switch-group">
+                            <button class="theme-btn active" id="theme-light-btn" onclick="setTheme('light')">
+                                <i class="fa-solid fa-sun"></i> Light
+                            </button>
+                            <button class="theme-btn" id="theme-dark-btn" onclick="setTheme('dark')">
+                                <i class="fa-solid fa-moon"></i> Dark
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="settings-group">
+                <div class="sg-title"><i class="fa-solid fa-sliders text-blue"></i> Risk Thresholds</div>
+                <div class="settings-card">
+                    <div class="setting-row">
+                        <div class="setting-info">
+                            <div class="sn">Low Risk Threshold</div>
+                            <div class="sd">Scores below this are considered low risk</div>
+                        </div>
+                        <div class="slider-wrap">
+                            <input type="range" min="0" max="100" value="30" class="setting-slider" id="threshold-low"
+                                oninput="document.getElementById('tl-val').textContent=this.value+'%'">
+                            <span class="slider-val" id="tl-val">30%</span>
+                        </div>
+                    </div>
+                    <div class="setting-row">
+                        <div class="setting-info">
+                            <div class="sn">High Risk Threshold</div>
+                            <div class="sd">Scores above this are flagged as high risk</div>
+                        </div>
+                        <div class="slider-wrap">
+                            <input type="range" min="0" max="100" value="60" class="setting-slider" id="threshold-high"
+                                oninput="document.getElementById('th-val').textContent=this.value+'%'">
+                            <span class="slider-val" id="th-val">60%</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="settings-group">
+                <div class="sg-title"><i class="fa-solid fa-display text-teal"></i> Display Preferences</div>
+                <div class="settings-card">
+                    <div class="setting-row">
+                        <div class="setting-info">
+                            <div class="sn">Show Detailed Breakdown</div>
+                            <div class="sd">Display per-metric diagnostic details after analysis</div>
+                        </div>
+                        <label class="toggle">
+                            <input type="checkbox" id="pref-breakdown" checked>
+                            <span class="toggle-track"><span class="toggle-thumb"></span></span>
+                        </label>
+                    </div>
+                    <div class="setting-row">
+                        <div class="setting-info">
+                            <div class="sn">Animate Results</div>
+                            <div class="sd">Enable score animation when results load</div>
+                        </div>
+                        <label class="toggle">
+                            <input type="checkbox" id="pref-animate" checked>
+                            <span class="toggle-track"><span class="toggle-thumb"></span></span>
+                        </label>
+                    </div>
+                    <div class="setting-row">
+                        <div class="setting-info">
+                            <div class="sn">Auto-switch to Dashboard</div>
+                            <div class="sd">Navigate to dashboard view after home analysis</div>
+                        </div>
+                        <label class="toggle">
+                            <input type="checkbox" id="pref-autonav">
+                            <span class="toggle-track"><span class="toggle-thumb"></span></span>
+                        </label>
+                    </div>
+                </div>
+            </div>
+
+            <div class="settings-group">
+                <div class="sg-title"><i class="fa-solid fa-circle-info text-orange"></i> System Info</div>
+                <div class="settings-card">
+                    <div class="setting-row">
+                        <div class="setting-info">
+                            <div class="sn">Version</div>
+                            <div class="sd">TruthLens AI</div>
+                        </div>
+                        <span class="info-badge">v1.0.0</span>
+                    </div>
+                    <div class="setting-row">
+                        <div class="setting-info">
+                            <div class="sn">Backend</div>
+                            <div class="sd">FastAPI + Uvicorn</div>
+                        </div>
+                        <span class="info-badge online">● Online</span>
+                    </div>
+                    <div class="setting-row">
+                        <div class="setting-info">
+                            <div class="sn">API Endpoint</div>
+                            <div class="sd">POST /api/evaluate</div>
+                        </div>
+                        <span class="info-badge">127.0.0.1:8000</span>
+                    </div>
+                    <div class="setting-row">
+                        <div class="setting-info">
+                            <div class="sn">Detection Signals</div>
+                            <div class="sd">Active modules</div>
+                        </div>
+                        <span class="info-badge">5 / 5</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="settings-footer">
+            <button class="btn-primary" id="save-settings-btn"><i class="fa-solid fa-floppy-disk"></i> Save
+                Settings</button>
+            <button class="btn-secondary" id="reset-settings-btn"><i class="fa-solid fa-rotate-left"></i> Reset
+                Defaults</button>
+        </div>
+    </div>
+<!-- Interactive Hover Tooltip -->
+    <div id="truthlens-tooltip" class="tl-tooltip hidden">
+        <div class="tl-tooltip-header">
+            <span id="tt-type">Claim Type</span>
+            <span id="tt-status" class="tt-status-pill">Status</span>
+        </div>
+        <div class="tl-tooltip-meta">
+            <i class="fa-solid fa-bullseye"></i> Confidence: <span id="tt-conf">0%</span>
+        </div>
+        <div class="tl-tooltip-reason" id="tt-reason">
+            Reason details will appear here.
+        </div>
+    </div>
+
+    <script src="/static/app.js?v=11"></script>
+</body>
+
+</html>

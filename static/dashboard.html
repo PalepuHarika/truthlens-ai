@@ -1,0 +1,1036 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TruthLens AI | Hallucination Detection</title>
+    <meta name="description"
+        content="TruthLens AI detects hallucinations in LLM outputs using NLI, HHEM, and semantic consistency scoring.">
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/static/style.css?v=10">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        /* High-Priority Theme Overrides */
+        body {
+            background: linear-gradient(135deg, #ffffff 0%, #f3f6fc 50%, #faf5ff 100%) !important;
+            background-attachment: fixed !important;
+        }
+
+        [data-theme="dark"] body {
+            background: linear-gradient(135deg, #0f172a 0%, #0c1527 50%, #171026 100%) !important;
+            background-attachment: fixed !important;
+            color: #f1f5f9 !important;
+        }
+
+        .view {
+            background: transparent !important;
+        }
+
+        [data-theme="dark"] .view {
+            background: transparent !important;
+        }
+
+        [data-theme="dark"] .settings-card,
+        [data-theme="dark"] .panel-card {
+            background: #1e293b !important;
+            border-color: rgba(255, 255, 255, 0.1) !important;
+            color: #f1f5f9 !important;
+        }
+
+        [data-theme="dark"] .navbar {
+            background: rgba(15, 23, 42, 0.9) !important;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1) !important;
+        }
+
+        [data-theme="dark"] .nav-link,
+        [data-theme="dark"] .page-title,
+        [data-theme="dark"] .sn {
+            color: #f1f5f9 !important;
+        }
+
+        /* Form Inputs Color Corrections */
+        .form-input {
+            color: #1e293b !important;
+            background-color: #ffffff !important;
+            border: 1px solid #cbd5e1 !important;
+            border-radius: 6px;
+            padding: 0.6rem 0.8rem;
+            font-size: 0.95rem;
+            outline: none;
+            transition: border-color 0.2s ease, box-shadow 0.2s ease;
+        }
+        .form-input:focus {
+            background-color: #ffffff !important;
+            border-color: var(--primary) !important;
+            box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.15) !important;
+        }
+        .form-input option {
+            color: #1e293b !important;
+            background-color: #ffffff !important;
+        }
+        .form-input::placeholder {
+            color: #64748b !important;
+            opacity: 0.8;
+        }
+
+        /* Dark Theme overrides for Contact Form */
+        [data-theme="dark"] .contact-form-container {
+            background: #1e293b !important;
+            border-color: rgba(255, 255, 255, 0.1) !important;
+        }
+        [data-theme="dark"] .form-input {
+            color: #f1f5f9 !important;
+            background-color: #0f172a !important;
+            border-color: rgba(255, 255, 255, 0.15) !important;
+        }
+        [data-theme="dark"] .form-input:focus {
+            background-color: #0f172a !important;
+            color: #f1f5f9 !important;
+        }
+        [data-theme="dark"] .form-input option {
+            color: #f1f5f9 !important;
+            background-color: #0f172a !important;
+        }
+
+
+
+        /* Smooth Transition */
+        body {
+            transition: background 0.3s ease, color 0.3s ease;
+        }
+
+        /* Dashboard Custom Grid & Table */
+        .dashboard-grid {
+            display: grid;
+            grid-template-columns: 2.2fr 1fr;
+            gap: 1.5rem;
+            margin-top: 1.5rem;
+            margin-bottom: 3rem;
+        }
+        @media (max-width: 992px) {
+            .dashboard-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+        .db-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.9rem;
+        }
+        .db-table th, .db-table td {
+            padding: 0.75rem 1rem;
+            text-align: left;
+            border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+        }
+        [data-theme="dark"] .db-table th, [data-theme="dark"] .db-table td {
+            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+        }
+        .db-table th {
+            font-weight: 600;
+            color: var(--text-dark);
+            background-color: rgba(0, 0, 0, 0.02);
+        }
+        [data-theme="dark"] .db-table th {
+            color: #f1f5f9;
+            background-color: rgba(255, 255, 255, 0.02);
+        }
+        .db-table tbody tr {
+            transition: background-color 0.2s ease;
+        }
+        .db-table tbody tr:hover {
+            background-color: rgba(0, 0, 0, 0.01);
+        }
+        [data-theme="dark"] .db-table tbody tr:hover {
+            background-color: rgba(255, 255, 255, 0.02);
+        }
+        .badge-verdict {
+            padding: 0.25rem 0.5rem;
+            border-radius: 6px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            display: inline-block;
+        }
+        .badge-verdict.high-trust {
+            background-color: #dcfce7 !important;
+            color: #14532d !important;
+        }
+        .badge-verdict.moderate-risk {
+            background-color: #fef3c7 !important;
+            color: #92400e !important;
+        }
+        .badge-verdict.high-risk {
+            background-color: #fee2e2 !important;
+            color: #991b1b !important;
+        }
+        .badge-verdict.severe-risk {
+            background-color: #fecaca !important;
+            color: #7f1d1d !important;
+        }
+        .risk-level-badge.severe {
+            background: #fecaca !important;
+            color: #7f1d1d !important;
+        }
+        [data-theme="dark"] .risk-level-badge.severe {
+            background: rgba(220, 38, 38, 0.2) !important;
+            color: #fca5a5 !important;
+        }
+        .quick-actions-list {
+            display: flex;
+            flex-direction: column;
+            gap: 0.75rem;
+            margin-top: 1rem;
+        }
+        .features-grid-2x2 {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 2rem;
+            margin-top: 3rem;
+            margin-bottom: 5rem;
+        }
+        @media (max-width: 768px) {
+            .features-grid-2x2 {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        /* Complete Chat Management System Custom Styles */
+        .filter-pill {
+            background: rgba(0, 0, 0, 0.03);
+            border: 1px solid var(--panel-border);
+            color: var(--text-muted);
+            border-radius: 20px;
+            padding: 0.35rem 0.75rem;
+            font-size: 0.75rem;
+            font-weight: 500;
+            white-space: nowrap;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            font-family: inherit;
+        }
+
+        .filter-pill:hover {
+            background: rgba(0, 0, 0, 0.06);
+            color: var(--text-main);
+        }
+
+        .filter-pill.active {
+            background: var(--primary) !important;
+            border-color: var(--primary) !important;
+            color: #ffffff !important;
+            box-shadow: 0 2px 8px rgba(79, 70, 229, 0.25);
+        }
+
+        [data-theme="dark"] .filter-pill {
+            background: rgba(255, 255, 255, 0.03);
+            border-color: var(--panel-border);
+            color: var(--text-muted);
+        }
+
+        [data-theme="dark"] .filter-pill:hover {
+            background: rgba(255, 255, 255, 0.06);
+            color: var(--text-main);
+        }
+
+        .chat-sidebar-item {
+            display: flex;
+            align-items: center;
+            gap: 0.65rem;
+            background: var(--white);
+            border: 1px solid var(--panel-border);
+            border-radius: 10px;
+            padding: 0.65rem;
+            position: relative;
+            transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+            box-shadow: var(--shadow-soft);
+        }
+
+        .chat-sidebar-item:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 12px rgba(0, 0, 0, 0.03), 0 0 0 1px rgba(79, 70, 229, 0.1);
+            border-color: rgba(79, 70, 229, 0.2);
+        }
+
+        .chat-sidebar-item.selected {
+            border-color: var(--primary);
+            background: rgba(79, 70, 229, 0.02);
+            box-shadow: 0 4px 10px rgba(79, 70, 229, 0.05), 0 0 0 1px var(--primary);
+        }
+
+        [data-theme="dark"] .chat-sidebar-item.selected {
+            background: rgba(79, 70, 229, 0.08);
+            border-color: var(--primary);
+        }
+
+        .csi-checkbox-wrap {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .csi-checkbox {
+            cursor: pointer;
+            width: 15px;
+            height: 15px;
+            accent-color: var(--primary);
+        }
+
+        .csi-body {
+            flex: 1;
+            min-width: 0;
+            cursor: pointer;
+        }
+
+        .csi-title-wrap {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 0.5rem;
+        }
+
+        .csi-title {
+            font-weight: 550;
+            font-size: 0.85rem;
+            color: var(--text-main);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .csi-meta {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-top: 0.3rem;
+        }
+
+        .csi-date {
+            font-size: 0.72rem;
+            color: var(--text-muted);
+        }
+
+        .csi-actions {
+            display: flex;
+            align-items: center;
+            gap: 0.35rem;
+        }
+
+        .csi-btn {
+            background: transparent;
+            border: none;
+            cursor: pointer;
+            color: var(--text-muted);
+            font-size: 0.8rem;
+            padding: 0.2rem;
+            border-radius: 4px;
+            transition: all 0.2s;
+        }
+
+        .csi-btn:hover {
+            color: var(--text-main);
+            background: rgba(0,0,0,0.05);
+        }
+        
+        [data-theme="dark"] .csi-btn:hover {
+            background: rgba(255,255,255,0.08);
+        }
+
+        .csi-btn.save-active {
+            color: #f59e0b;
+        }
+
+        .csi-btn.delete-btn:hover {
+            color: #ef4444;
+            background: rgba(239, 68, 68, 0.08);
+        }
+
+        /* Timeline Styles */
+        .timeline-event {
+            position: relative;
+            margin-bottom: 0.25rem;
+        }
+
+        .timeline-event::before {
+            content: '';
+            position: absolute;
+            left: -25px;
+            top: 4px;
+            width: 8px;
+            height: 8px;
+            background: var(--primary);
+            border-radius: 50%;
+            border: 2px solid var(--white);
+            box-shadow: 0 0 0 2px rgba(79, 70, 229, 0.15);
+        }
+        
+        .timeline-event.saved::before {
+            background: #10b981;
+            box-shadow: 0 0 0 2px rgba(16, 185, 129, 0.15);
+        }
+
+        .timeline-event.deleted::before {
+            background: #ef4444;
+            box-shadow: 0 0 0 2px rgba(239, 68, 68, 0.15);
+        }
+
+        .timeline-time {
+            font-size: 0.68rem;
+            color: var(--text-muted);
+            font-weight: 500;
+        }
+
+        .timeline-text {
+            color: var(--text-main);
+            margin-top: 1px;
+        }
+
+        /* Premium Modal View */
+        .chat-modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            background: rgba(15, 23, 42, 0.5);
+            backdrop-filter: blur(8px);
+            z-index: 2000;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            animation: fadeIn 0.25s ease-out;
+        }
+
+        .chat-modal-window {
+            background: var(--white);
+            border: 1px solid var(--panel-border);
+            border-radius: 20px;
+            width: 90%;
+            max-width: 760px;
+            max-height: 85vh;
+            display: flex;
+            flex-direction: column;
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.15);
+            animation: slideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+            overflow: hidden;
+        }
+
+        .cm-header {
+            padding: 1.25rem 1.5rem;
+            border-bottom: 1px solid var(--panel-border);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: rgba(0,0,0,0.01);
+        }
+        
+        [data-theme="dark"] .cm-header {
+            background: rgba(255,255,255,0.01);
+        }
+
+        .cm-title-container {
+            min-width: 0;
+        }
+
+        .cm-title {
+            font-size: 1.1rem;
+            font-weight: 600;
+            color: var(--text-main);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .cm-meta {
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            margin-top: 0.2rem;
+            display: flex;
+            gap: 0.75rem;
+        }
+
+        .cm-close {
+            background: transparent;
+            border: none;
+            font-size: 1.2rem;
+            color: var(--text-muted);
+            cursor: pointer;
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s;
+        }
+
+        .cm-close:hover {
+            background: rgba(0,0,0,0.05);
+            color: var(--text-main);
+        }
+        
+        [data-theme="dark"] .cm-close:hover {
+            background: rgba(255,255,255,0.08);
+        }
+
+        .cm-body {
+            padding: 1.5rem;
+            overflow-y: auto;
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            gap: 1.25rem;
+            background: linear-gradient(to bottom, transparent, rgba(0,0,0,0.005));
+        }
+
+        .cm-bubble {
+            display: flex;
+            flex-direction: column;
+            max-width: 85%;
+            border-radius: 16px;
+            padding: 1rem 1.25rem;
+            line-height: 1.6;
+            font-size: 0.95rem;
+            position: relative;
+        }
+
+        .cm-bubble.user {
+            align-self: flex-end;
+            background: linear-gradient(135deg, var(--primary) 0%, #6366f1 100%);
+            color: #ffffff;
+            border-bottom-right-radius: 4px;
+            box-shadow: 0 4px 10px rgba(79, 70, 229, 0.2);
+        }
+
+        .cm-bubble.ai {
+            align-self: flex-start;
+            background: var(--white);
+            border: 1px solid var(--panel-border);
+            color: var(--text-main);
+            border-top-left-radius: 4px;
+            box-shadow: var(--shadow-soft);
+        }
+
+        .cm-label {
+            font-size: 0.72rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 0.4rem;
+        }
+
+        .cm-bubble.user .cm-label {
+            color: rgba(255,255,255,0.7);
+        }
+
+        .cm-bubble.ai .cm-label {
+            color: var(--primary);
+        }
+
+        .cm-footer {
+            padding: 1rem 1.5rem;
+            border-top: 1px solid var(--panel-border);
+            display: flex;
+            justify-content: flex-end;
+            gap: 0.75rem;
+            background: rgba(0,0,0,0.01);
+        }
+        
+        [data-theme="dark"] .cm-footer {
+            background: rgba(255,255,255,0.01);
+        }
+
+        /* Animations */
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+
+        @keyframes slideUp {
+            from { transform: translateY(20px); opacity: 0; }
+            to { transform: translateY(0); opacity: 1; }
+        }
+
+        /* Delete Confirmation Dialog */
+        .confirm-dialog-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            background: rgba(15, 23, 42, 0.4);
+            backdrop-filter: blur(4px);
+            z-index: 3000;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            animation: fadeIn 0.2s ease-out;
+        }
+
+        .confirm-dialog {
+            background: var(--white);
+            border: 1px solid var(--panel-border);
+            border-radius: 16px;
+            width: 90%;
+            max-width: 400px;
+            padding: 1.5rem;
+            box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1), 0 10px 10px -5px rgba(0,0,0,0.04);
+            animation: slideUp 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+    </style>
+    <script>
+        function setTheme(theme) {
+            console.log('Force applying theme:', theme);
+            document.documentElement.setAttribute('data-theme', theme);
+            localStorage.setItem('truthlens_theme', theme);
+
+            // Sync with existing buttons if they exist
+            const lightBtn = document.getElementById('theme-light-btn');
+            const darkBtn = document.getElementById('theme-dark-btn');
+            if (lightBtn && darkBtn) {
+                if (theme === 'dark') {
+                    darkBtn.classList.add('active');
+                    lightBtn.classList.remove('active');
+                } else {
+                    lightBtn.classList.add('active');
+                    darkBtn.classList.remove('active');
+                }
+            }
+        }
+        // Early load to prevent flicker
+        const saved = localStorage.getItem('truthlens_theme') || 'light';
+        document.documentElement.setAttribute('data-theme', saved);
+
+        // --- Chat File Logic ---
+        function triggerChatUpload() {
+            console.log('Triggering chat upload...');
+            document.getElementById('chat-file-input')?.click();
+        }
+
+        async function handleChatFileSelect(input) {
+            const file = input.files[0];
+            if (!file) return;
+
+            console.log('File selected:', file.name);
+            // We call the global app.js logic via a custom event or direct call
+            if (window.truthLens_handleFileUpload) {
+                window.truthLens_handleFileUpload(file);
+            } else {
+                console.error('App logic not loaded yet');
+            }
+        }
+    </script>
+</head>
+
+<body>
+
+
+    <nav class="navbar">
+        <div class="logo" onclick="navigateTo('home')" style="cursor: pointer;">
+            <i class="fa-solid fa-brain"></i>
+            <span>TruthLens <strong>AI</strong></span>
+        </div>
+        <div class="nav-links">
+            <a href="/" class="nav-link" data-view="home">Home</a>
+            <a href="/dashboard" class="nav-link active" data-view="dashboard">Dashboard</a>
+            <a href="/chat" class="nav-link" data-view="chat">Chat</a>
+            <a href="/analysis" class="nav-link" data-view="analysis">Analysis</a>
+            <a href="/features" class="nav-link" data-view="features">Features</a>
+            <a href="/contact" class="nav-link" data-view="contact">Contact</a>
+            <a href="/settings" class="nav-link" data-view="settings">Settings</a>
+            <a href="/login" class="nav-link" data-view="login" id="nav-login-btn">Login</a>
+        </div>
+        <button class="btn-primary btn-sm" id="new-analysis-btn">
+            <i class="fa-solid fa-wand-magic-sparkles"></i> New Analysis
+        </button>
+    </nav>
+
+    
+<div id="view-dashboard" class="view active-view">
+        <div class="page-header">
+            <div>
+                <div class="page-title">User <span class="text-gradient">Dashboard</span></div>
+                <div class="page-subtitle">Recent activity, verification analytics, and trend reports</div>
+            </div>
+            <div class="status-pill"><span class="dot"></span> Session Active</div>
+        </div>
+
+        <!-- Dashboard Stats Grid -->
+        <section class="stats-section" style="padding: 0; margin-bottom: 2rem;">
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <div class="stat-num" id="db-stat-accuracy">92%</div>
+                    <div class="stat-label">Average Accuracy</div>
+                    <div class="stat-sub" id="db-stat-accuracy-sub">Based on runs</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-num" id="db-stat-models">3</div>
+                    <div class="stat-label">Active Models</div>
+                    <div class="stat-sub">Simulated LLMs</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-num" id="db-stat-total">0</div>
+                    <div class="stat-label">Total Analyses</div>
+                    <div class="stat-sub" id="db-stat-total-sub">Saved locally</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-num" id="db-stat-risk">0</div>
+                    <div class="stat-label">Risk Reports</div>
+                    <div class="stat-sub" id="db-stat-risk-sub">>30% risk flagged</div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Dashboard Layout Grid -->
+        <div class="dashboard-grid">
+            <div class="db-grid-left">
+                <!-- Hybrid Risk Layout: Score Card + Mini Trend -->
+                <div class="panel-card" style="margin-bottom: 1.5rem;">
+                    <div class="panel-card-header">
+                        <i class="fa-solid fa-shield-halved text-blue"></i> Hallucination Risk Overview
+                    </div>
+                    <div class="risk-hybrid-grid">
+
+                        <!-- LEFT: Current Risk Score Card -->
+                        <div class="risk-score-card">
+                            <div class="risk-score-title">Current Hallucination Risk</div>
+                            <!-- Circular Progress -->
+                            <div class="risk-radial-wrap">
+                                <svg class="risk-radial-svg" viewBox="0 0 120 120">
+                                    <circle class="risk-radial-bg" cx="60" cy="60" r="50"/>
+                                    <circle class="risk-radial-fill" id="risk-radial-fill" cx="60" cy="60" r="50"
+                                        stroke-dasharray="0 314"
+                                        stroke-dashoffset="78.5"/>
+                                    <text class="risk-radial-pct" id="risk-radial-pct" x="60" y="56">--</text>
+                                    <text class="risk-radial-sub" id="risk-radial-sub" x="60" y="74">No Data</text>
+                                </svg>
+                            </div>
+                            <!-- Risk Level Badge -->
+                            <div class="risk-level-badge" id="risk-level-badge">— No Analysis Yet —</div>
+                            <!-- Detail rows -->
+                            <div class="risk-detail-rows">
+                                <div class="risk-detail-row">
+                                    <span class="risk-detail-icon"><i class="fa-solid fa-triangle-exclamation"></i></span>
+                                    <span class="risk-detail-label">Contradictions</span>
+                                    <span class="risk-detail-val" id="rsk-contradictions">—</span>
+                                </div>
+                                <div class="risk-detail-row">
+                                    <span class="risk-detail-icon"><i class="fa-solid fa-circle-question"></i></span>
+                                    <span class="risk-detail-label">Unsupported Claims</span>
+                                    <span class="risk-detail-val" id="rsk-unsupported">—</span>
+                                </div>
+                                <div class="risk-detail-row">
+                                    <span class="risk-detail-icon"><i class="fa-solid fa-bullseye"></i></span>
+                                    <span class="risk-detail-label">Confidence Score</span>
+                                    <span class="risk-detail-val" id="rsk-confidence">—</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- RIGHT: Mini Trend Chart -->
+                        <div class="risk-trend-side">
+                            <div class="risk-trend-header">
+                                <i class="fa-solid fa-chart-line text-blue"></i>
+                                <span>Risk Trend History</span>
+                            </div>
+                            <!-- Canvas (shown when data exists) -->
+                            <div class="risk-trend-chart-wrap" id="risk-trend-chart-wrap" style="height: 180px; position: relative;">
+                                <canvas id="dashboard-chart"></canvas>
+                            </div>
+                            <!-- Empty state (shown when no data) -->
+                            <div class="risk-trend-empty" id="risk-trend-empty">
+                                <i class="fa-solid fa-clock-rotate-left"></i>
+                                <p>No historical analysis data available</p>
+                                <span>Run your first analysis to start tracking risk over time.</span>
+                            </div>
+                        </div>
+
+                    </div>
+                </div>
+
+                <!-- Recent Analyses Table -->
+                <div class="panel-card">
+                    <div class="panel-card-header" style="justify-content: space-between; display: flex; align-items: center;">
+                        <span><i class="fa-solid fa-list-check text-purple"></i> Recent Analyses</span>
+                        <span class="panel-badge" id="db-table-count">0 total</span>
+                    </div>
+                    <div style="overflow-x: auto; margin-top: 1rem;">
+                        <table class="db-table">
+                            <thead>
+                                <tr>
+                                    <th>Date</th>
+                                    <th>Prompt</th>
+                                    <th>Risk Score</th>
+                                    <th>Verdict</th>
+                                    <th style="text-align: right;">Action</th>
+                                </tr>
+                            </thead>
+                            <tbody id="db-table-body">
+                                <tr>
+                                    <td colspan="5" style="text-align: center; color: var(--text-muted); padding: 2rem;">
+                                        No analysis runs found. Start a new analysis to see results here!
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <div class="db-grid-right">
+                <!-- All Chats Panel -->
+                <div class="panel-card" id="all-chats-panel" style="margin-bottom: 1.5rem;">
+                    <div class="panel-card-header" style="display: flex; justify-content: space-between; align-items: center;">
+                        <span><i class="fa-solid fa-comments text-primary"></i> All Chats</span>
+                        <div class="search-wrap" style="position: relative; width: 150px;">
+                            <i class="fa-solid fa-magnifying-glass search-icon-inside" style="position: absolute; left: 8px; top: 50%; transform: translateY(-50%); font-size: 0.8rem; color: var(--text-muted);"></i>
+                            <input type="text" id="chats-search-input" placeholder="Search chats..." style="width: 100%; padding: 0.35rem 0.35rem 0.35rem 1.6rem; font-size: 0.82rem; border-radius: 6px; border: 1px solid var(--panel-border); outline: none; font-family: inherit; background: var(--white); color: var(--text-main);">
+                        </div>
+                    </div>
+
+                    <!-- Filters Bar -->
+                    <div class="chats-filter-container" style="display: flex; gap: 0.4rem; padding: 0.5rem 0; margin-bottom: 0.5rem; overflow-x: auto; scrollbar-width: none;">
+                        <button class="filter-pill active" data-filter="all">All</button>
+                        <button class="filter-pill" data-filter="saved"><i class="fa-solid fa-bookmark" style="font-size:0.7rem; margin-right:2px;"></i> Saved</button>
+                        <button class="filter-pill" data-filter="high-trust">High Trust</button>
+                        <button class="filter-pill" data-filter="medium-risk">Medium Risk</button>
+                        <button class="filter-pill" data-filter="severe-risk">Severe Risk</button>
+                        <button class="filter-pill" data-filter="today">Today</button>
+                        <button class="filter-pill" data-filter="7days">7 Days</button>
+                        <button class="filter-pill" data-filter="30days">30 Days</button>
+                    </div>
+
+                    <!-- Bulk Actions Toolbar -->
+                    <div id="bulk-actions-toolbar" class="bulk-toolbar hidden" style="display: flex; justify-content: space-between; align-items: center; background: rgba(79, 70, 229, 0.08); border: 1px solid rgba(79, 70, 229, 0.2); padding: 0.5rem 0.75rem; border-radius: 8px; margin-bottom: 0.75rem; font-size: 0.8rem;">
+                        <div style="display: flex; align-items: center; gap: 0.5rem; font-weight: 500;">
+                            <input type="checkbox" id="bulk-select-all" style="cursor: pointer; width: 14px; height: 14px;">
+                            <span>Select All (<span id="bulk-selected-count">0</span>)</span>
+                        </div>
+                        <div style="display: flex; gap: 0.4rem;">
+                            <button id="bulk-save-btn" class="btn-secondary btn-sm" title="Save Selected" style="padding: 0.25rem 0.5rem; font-size: 0.75rem;"><i class="fa-solid fa-bookmark"></i></button>
+                            <button id="bulk-delete-btn" class="btn-secondary btn-sm" title="Delete Selected" style="padding: 0.25rem 0.5rem; font-size: 0.75rem; color: #ef4444; border-color: rgba(239, 68, 68, 0.3);"><i class="fa-solid fa-trash-can"></i></button>
+                            <button id="bulk-export-btn" class="btn-secondary btn-sm" title="Export Selected" style="padding: 0.25rem 0.5rem; font-size: 0.75rem;"><i class="fa-solid fa-download"></i></button>
+                        </div>
+                    </div>
+
+                    <!-- Chat List Scrollable -->
+                    <div class="chats-scroll-list" id="chats-sidebar-list" style="max-height: 380px; overflow-y: auto; padding-right: 2px; display: flex; flex-direction: column; gap: 0.5rem; min-height: 120px;">
+                        <div style="text-align: center; color: var(--text-muted); padding: 2rem;">Loading chats...</div>
+                    </div>
+
+                    <button class="btn-secondary" onclick="navigateTo('chat')" style="width: 100%; margin-top: 1rem; font-size: 0.85rem; padding: 0.5rem; justify-content: center; border-color: var(--panel-border); font-family: inherit;">
+                        <i class="fa-solid fa-comments"></i> View All Chats
+                    </button>
+                </div>
+
+                <!-- Chat Statistics Widget -->
+                <div class="panel-card" style="margin-bottom: 1.5rem;">
+                    <div class="panel-card-header">
+                        <i class="fa-solid fa-chart-simple text-purple"></i> Chat Statistics
+                    </div>
+                    <div class="chats-stats-grid" style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 0.75rem; margin-top: 1rem;">
+                        <div class="chat-stat-box" style="background: rgba(0,0,0,0.02); border: 1px solid var(--panel-border); padding: 0.75rem; border-radius: 8px; text-align: center;">
+                            <div style="font-size: 1.4rem; font-weight: 700; color: var(--primary);" id="st-total-chats">0</div>
+                            <div style="font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.3px; color: var(--text-muted); margin-top: 2px;">Total Chats</div>
+                        </div>
+                        <div class="chat-stat-box" style="background: rgba(0,0,0,0.02); border: 1px solid var(--panel-border); padding: 0.75rem; border-radius: 8px; text-align: center;">
+                            <div style="font-size: 1.4rem; font-weight: 700; color: #10b981;" id="st-saved-chats">0</div>
+                            <div style="font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.3px; color: var(--text-muted); margin-top: 2px;">Saved Chats</div>
+                        </div>
+                        <div class="chat-stat-box" style="background: rgba(0,0,0,0.02); border: 1px solid var(--panel-border); padding: 0.75rem; border-radius: 8px; text-align: center;">
+                            <div style="font-size: 1.4rem; font-weight: 700; color: #0d9488;" id="st-high-trust">0</div>
+                            <div style="font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.3px; color: var(--text-muted); margin-top: 2px;">High Trust</div>
+                        </div>
+                        <div class="chat-stat-box" style="background: rgba(0,0,0,0.02); border: 1px solid var(--panel-border); padding: 0.75rem; border-radius: 8px; text-align: center;">
+                            <div style="font-size: 1.4rem; font-weight: 700; color: #ef4444;" id="st-severe-risk">0</div>
+                            <div style="font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.3px; color: var(--text-muted); margin-top: 2px;">Severe Risk</div>
+                        </div>
+                    </div>
+                    <div style="background: rgba(0,0,0,0.02); border: 1px solid var(--panel-border); padding: 0.75rem; border-radius: 8px; margin-top: 0.75rem; display: flex; justify-content: space-between; align-items: center;">
+                        <span style="font-size: 0.8rem; font-weight: 500; color: var(--text-muted);">Avg Hallucination Score:</span>
+                        <span style="font-size: 1.1rem; font-weight: 700; color: var(--text-main);" id="st-avg-risk">0%</span>
+                    </div>
+                </div>
+
+                <!-- Saved Chats Quick Access -->
+                <div class="panel-card" style="margin-bottom: 1.5rem;" id="saved-quick-access-card">
+                    <div class="panel-card-header">
+                        <i class="fa-solid fa-bookmark text-teal"></i> Saved Chats Quick Access
+                    </div>
+                    <div class="saved-quick-list" id="saved-quick-list" style="display: flex; flex-direction: column; gap: 0.4rem; margin-top: 0.75rem; font-size: 0.8rem;">
+                        <div style="text-align: center; color: var(--text-muted); padding: 1rem 0;">No saved chats yet.</div>
+                    </div>
+                </div>
+
+                <!-- Recent Activity Timeline -->
+                <div class="panel-card" style="margin-bottom: 1.5rem;">
+                    <div class="panel-card-header">
+                        <i class="fa-solid fa-clock-rotate-left text-orange"></i> Recent Activity Timeline
+                    </div>
+                    <div class="activity-timeline-container" style="position: relative; padding-left: 1.25rem; margin-top: 1rem; border-left: 2px solid var(--panel-border); margin-left: 10px;">
+                        <div id="chats-activity-timeline" style="display: flex; flex-direction: column; gap: 0.85rem; font-size: 0.78rem; text-align: left;">
+                            <div style="color: var(--text-muted); text-align: center; padding: 0.5rem 0;">No recent activities.</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Export Chats Widget -->
+                <div class="panel-card" style="margin-bottom: 1.5rem;">
+                    <div class="panel-card-header">
+                        <i class="fa-solid fa-file-export text-secondary"></i> Export Chats Section
+                    </div>
+                    <div style="display: flex; flex-direction: column; gap: 0.6rem; margin-top: 1rem;">
+                        <div style="font-size: 0.8rem; color: var(--text-muted);">Export selected or all chat logs in your preferred formats:</div>
+                        <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 0.5rem;">
+                            <button id="exp-pdf-btn" class="btn-secondary" style="padding: 0.5rem; justify-content: center; font-size: 0.8rem; font-family: inherit;"><i class="fa-solid fa-file-pdf" style="color:#ef4444; margin-right: 4px;"></i> PDF Document</button>
+                            <button id="exp-txt-btn" class="btn-secondary" style="padding: 0.5rem; justify-content: center; font-size: 0.8rem; font-family: inherit;"><i class="fa-solid fa-file-lines" style="color:#3b82f6; margin-right: 4px;"></i> Plain Text</button>
+                            <button id="exp-json-btn" class="btn-secondary" style="padding: 0.5rem; justify-content: center; font-size: 0.8rem; font-family: inherit;"><i class="fa-solid fa-file-code" style="color:#f59e0b; margin-right: 4px;"></i> JSON Format</button>
+                            <button id="exp-csv-btn" class="btn-secondary" style="padding: 0.5rem; justify-content: center; font-size: 0.8rem; font-family: inherit;"><i class="fa-solid fa-file-csv" style="color:#10b981; margin-right: 4px;"></i> CSV Sheet</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- About Hallucination Risk Explanation Card -->
+        <div class="panel-card" id="db-hallucination-explain" style="margin-bottom: 1.5rem;">
+            <div class="panel-card-header">
+                <i class="fa-solid fa-circle-info text-purple"></i> About Hallucination Risk
+            </div>
+            <p style="font-size: 0.92rem; color: var(--text-muted); line-height: 1.65; margin-bottom: 1.25rem;">
+                This score represents the probability that an AI-generated response contains
+                <strong>unsupported, contradictory, or fabricated information</strong> — commonly known as AI hallucination.
+            </p>
+            <div class="hallucination-explain-grid">
+                <div class="hex-factors">
+                    <div class="hex-factor-title"><i class="fa-solid fa-microscope"></i> Risk Calculation Factors</div>
+                    <ul class="hex-factor-list">
+                        <li><i class="fa-solid fa-check-circle" style="color:#6366f1"></i> NLI contradiction score</li>
+                        <li><i class="fa-solid fa-check-circle" style="color:#6366f1"></i> Grounding search mismatch</li>
+                        <li><i class="fa-solid fa-check-circle" style="color:#6366f1"></i> Cross-model disagreement</li>
+                        <li><i class="fa-solid fa-check-circle" style="color:#6366f1"></i> Heatmap uncertainty analysis</li>
+                    </ul>
+                </div>
+                <div class="hex-interpret">
+                    <div class="hex-factor-title"><i class="fa-solid fa-gauge-high"></i> Interpretation Guide</div>
+                    <div class="interpret-row">
+                        <span class="interpret-dot" style="background:#10b981"></span>
+                        <span><strong>Low (0–30%)</strong> — Mostly factual, well-grounded response</span>
+                    </div>
+                    <div class="interpret-row">
+                        <span class="interpret-dot" style="background:#f59e0b"></span>
+                        <span><strong>Medium (31–70%)</strong> — Some uncertainty or unsupported claims</span>
+                    </div>
+                    <div class="interpret-row">
+                        <span class="interpret-dot" style="background:#ef4444"></span>
+                        <span><strong>High (71–100%)</strong> — Potential hallucination detected</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Analytics & Activity Log Widgets -->
+        <div class="fr-two-col" id="db-extra-widgets" style="margin-top: 1.5rem; margin-bottom: 3rem;">
+            <div class="panel-card fr-panel-card">
+                <div class="panel-card-header">
+                    <i class="fa-solid fa-chart-pie text-purple"></i> Analytics Insights
+                </div>
+                <div class="analytics-stats" id="fr-analytics">
+                    <div style="text-align: center; color: var(--text-muted); padding: 2rem 1rem;">No data available. Run an analysis to see insights.</div>
+                </div>
+            </div>
+            <div class="panel-card fr-panel-card">
+                <div class="panel-card-header">
+                    <i class="fa-solid fa-terminal text-teal"></i> Activity Log
+                </div>
+                <div id="fr-activity-log" class="activity-log">
+                    <div style="text-align: center; color: var(--text-muted); padding: 2rem 1rem;">No activity logged yet.</div>
+                </div>
+            </div>
+        </div>
+    </div>
+<!-- Interactive Hover Tooltip -->
+    <div id="truthlens-tooltip" class="tl-tooltip hidden">
+        <div class="tl-tooltip-header">
+            <span id="tt-type">Claim Type</span>
+            <span id="tt-status" class="tt-status-pill">Status</span>
+        </div>
+        <div class="tl-tooltip-meta">
+            <i class="fa-solid fa-bullseye"></i> Confidence: <span id="tt-conf">0%</span>
+        </div>
+        <div class="tl-tooltip-reason" id="tt-reason">
+            Reason details will appear here.
+        </div>
+    </div>
+
+        <!-- 6. Footer -->
+    <footer class="main-footer">
+        <div class="footer-content">
+            <div class="footer-logo">
+                <i class="fa-solid fa-brain"></i> TruthLens <strong>AI</strong>
+            </div>
+            <div class="footer-links">
+                <a href="/">Home</a>
+                <a href="/dashboard">Dashboard</a>
+                <a href="/chat">Chat</a>
+                <a href="/about">About</a>
+                <a href="/contact">Contact</a>
+                <a href="/settings">Settings</a>
+            </div>
+            
+            <div class="footer-tech-stack">
+                <span class="footer-tech-badge">React</span>
+                <span class="footer-tech-badge">FastAPI</span>
+                <span class="footer-tech-badge">Transformers</span>
+                <span class="footer-tech-badge">NLP</span>
+                <span class="footer-tech-badge">FAISS</span>
+            </div>
+            
+            <div class="footer-copy">
+                &copy; 2026 TruthLens AI Academic Project. All rights reserved.
+            </div>
+        </div>
+    </footer>
+
+    <!-- ── View Full Chat Modal ──────────────────────────────────────────────── -->
+    <div id="chat-detail-modal" class="chat-modal-overlay hidden">
+        <div class="chat-modal-window">
+            <div class="cm-header">
+                <div class="cm-title-container">
+                    <div class="cm-title" id="cm-modal-title">Conversation Title</div>
+                    <div class="cm-meta">
+                        <span id="cm-modal-date"><i class="fa-solid fa-calendar-days"></i> Date</span>
+                        <span id="cm-modal-verdict">Verdict</span>
+                    </div>
+                </div>
+                <button class="cm-close" id="cm-modal-close"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <div class="cm-body" id="cm-modal-body">
+                <!-- Dialogue Bubbles filled by JS -->
+            </div>
+            <div class="cm-footer">
+                <button class="btn-secondary" id="cm-modal-export-txt" style="font-family: inherit;"><i class="fa-solid fa-file-lines" style="color:#3b82f6; margin-right: 4px;"></i> Export TXT</button>
+                <button class="btn-secondary" id="cm-modal-export-json" style="font-family: inherit;"><i class="fa-solid fa-file-code" style="color:#f59e0b; margin-right: 4px;"></i> Export JSON</button>
+                <button class="btn-primary" id="cm-modal-close-btn" style="font-family: inherit;">Close</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ── Delete Confirmation Dialog ────────────────────────────────────────── -->
+    <div id="chat-confirm-dialog" class="confirm-dialog-overlay hidden">
+        <div class="confirm-dialog">
+            <div style="padding: 1.5rem;">
+                <h3 style="font-size: 1.15rem; font-weight: 600; color: var(--text-main); margin-bottom: 0.75rem; display: flex; align-items: center; gap: 0.5rem;"><i class="fa-solid fa-circle-question" style="color:#ef4444;"></i> Confirm Deletion</h3>
+                <p style="font-size: 0.9rem; color: var(--text-muted); line-height: 1.5; margin-bottom: 1.5rem;" id="confirm-dialog-msg">Are you sure you want to delete this conversation? This operation cannot be undone.</p>
+                <div style="display: flex; justify-content: flex-end; gap: 0.6rem;">
+                    <button class="btn-secondary btn-sm" id="confirm-cancel-btn" style="font-family: inherit;">Cancel</button>
+                    <button class="btn-primary btn-sm" id="confirm-ok-btn" style="background:#ef4444; border:none; box-shadow: 0 2px 8px rgba(239, 68, 68, 0.2); font-family: inherit;">Delete</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="/static/app.js"></script>
+</body>
+
+</html>

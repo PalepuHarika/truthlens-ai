@@ -1,0 +1,502 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TruthLens AI | Hallucination Detection</title>
+    <meta name="description"
+        content="TruthLens AI detects hallucinations in LLM outputs using NLI, HHEM, and semantic consistency scoring.">
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/static/style.css?v=10">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        /* High-Priority Theme Overrides */
+        [data-theme="dark"] body {
+            background-color: #0f172a !important;
+            color: #f1f5f9 !important;
+        }
+
+        [data-theme="dark"] .view {
+            background-color: #0f172a !important;
+        }
+
+        [data-theme="dark"] .settings-card,
+        [data-theme="dark"] .panel-card {
+            background: #1e293b !important;
+            border-color: rgba(255, 255, 255, 0.1) !important;
+            color: #f1f5f9 !important;
+        }
+
+        [data-theme="dark"] .navbar {
+            background: rgba(15, 23, 42, 0.9) !important;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1) !important;
+        }
+
+        [data-theme="dark"] .nav-link,
+        [data-theme="dark"] .page-title,
+        [data-theme="dark"] .sn {
+            color: #f1f5f9 !important;
+        }
+
+        /* Form Inputs Color Corrections */
+        .form-input {
+            color: #1e293b !important;
+            background-color: #ffffff !important;
+            border: 1px solid #cbd5e1 !important;
+            border-radius: 6px;
+            padding: 0.6rem 0.8rem;
+            font-size: 0.95rem;
+            outline: none;
+            transition: border-color 0.2s ease, box-shadow 0.2s ease;
+        }
+        .form-input:focus {
+            background-color: #ffffff !important;
+            border-color: var(--primary) !important;
+            box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.15) !important;
+        }
+        .form-input option {
+            color: #1e293b !important;
+            background-color: #ffffff !important;
+        }
+        .form-input::placeholder {
+            color: #64748b !important;
+            opacity: 0.8;
+        }
+
+        /* Dark Theme overrides for Contact Form */
+        [data-theme="dark"] .contact-form-container {
+            background: #1e293b !important;
+            border-color: rgba(255, 255, 255, 0.1) !important;
+        }
+        [data-theme="dark"] .form-input {
+            color: #f1f5f9 !important;
+            background-color: #0f172a !important;
+            border-color: rgba(255, 255, 255, 0.15) !important;
+        }
+        [data-theme="dark"] .form-input:focus {
+            background-color: #0f172a !important;
+            color: #f1f5f9 !important;
+        }
+        [data-theme="dark"] .form-input option {
+            color: #f1f5f9 !important;
+            background-color: #0f172a !important;
+        }
+
+
+
+        /* Smooth Transition */
+        body {
+            transition: background 0.3s ease, color 0.3s ease;
+        }
+
+        /* Dashboard Custom Grid & Table */
+        .dashboard-grid {
+            display: grid;
+            grid-template-columns: 2.2fr 1fr;
+            gap: 1.5rem;
+            margin-top: 1.5rem;
+            margin-bottom: 3rem;
+        }
+        @media (max-width: 992px) {
+            .dashboard-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+        .db-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.9rem;
+        }
+        .db-table th, .db-table td {
+            padding: 0.75rem 1rem;
+            text-align: left;
+            border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+        }
+        [data-theme="dark"] .db-table th, [data-theme="dark"] .db-table td {
+            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+        }
+        .db-table th {
+            font-weight: 600;
+            color: var(--text-dark);
+            background-color: rgba(0, 0, 0, 0.02);
+        }
+        [data-theme="dark"] .db-table th {
+            color: #f1f5f9;
+            background-color: rgba(255, 255, 255, 0.02);
+        }
+        .db-table tbody tr {
+            transition: background-color 0.2s ease;
+        }
+        .db-table tbody tr:hover {
+            background-color: rgba(0, 0, 0, 0.01);
+        }
+        [data-theme="dark"] .db-table tbody tr:hover {
+            background-color: rgba(255, 255, 255, 0.02);
+        }
+        .badge-verdict {
+            padding: 0.25rem 0.5rem;
+            border-radius: 6px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            display: inline-block;
+        }
+        .badge-verdict.high-trust {
+            background-color: #dcfce7 !important;
+            color: #14532d !important;
+        }
+        .badge-verdict.moderate-risk {
+            background-color: #fef3c7 !important;
+            color: #92400e !important;
+        }
+        .badge-verdict.high-risk {
+            background-color: #fee2e2 !important;
+            color: #991b1b !important;
+        }
+        .quick-actions-list {
+            display: flex;
+            flex-direction: column;
+            gap: 0.75rem;
+            margin-top: 1rem;
+        }
+        .features-grid-2x2 {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 2rem;
+            margin-top: 3rem;
+            margin-bottom: 5rem;
+        }
+        @media (max-width: 768px) {
+            .features-grid-2x2 {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+    <script>
+        function setTheme(theme) {
+            console.log('Force applying theme:', theme);
+            document.documentElement.setAttribute('data-theme', theme);
+            localStorage.setItem('truthlens_theme', theme);
+
+            // Sync with existing buttons if they exist
+            const lightBtn = document.getElementById('theme-light-btn');
+            const darkBtn = document.getElementById('theme-dark-btn');
+            if (lightBtn && darkBtn) {
+                if (theme === 'dark') {
+                    darkBtn.classList.add('active');
+                    lightBtn.classList.remove('active');
+                } else {
+                    lightBtn.classList.add('active');
+                    darkBtn.classList.remove('active');
+                }
+            }
+        }
+        // Early load to prevent flicker
+        const saved = localStorage.getItem('truthlens_theme') || 'light';
+        document.documentElement.setAttribute('data-theme', saved);
+
+        // --- Chat File Logic ---
+        function triggerChatUpload() {
+            console.log('Triggering chat upload...');
+            document.getElementById('chat-file-input')?.click();
+        }
+
+        async function handleChatFileSelect(input) {
+            const file = input.files[0];
+            if (!file) return;
+
+            console.log('File selected:', file.name);
+            // We call the global app.js logic via a custom event or direct call
+            if (window.truthLens_handleFileUpload) {
+                window.truthLens_handleFileUpload(file);
+            } else {
+                console.error('App logic not loaded yet');
+            }
+        }
+    </script>
+</head>
+
+<body>
+
+
+    <nav class="navbar">
+        <div class="logo" onclick="navigateTo('home')" style="cursor: pointer;">
+            <i class="fa-solid fa-brain"></i>
+            <span>TruthLens <strong>AI</strong></span>
+        </div>
+        <div class="nav-links">
+            <a href="/" class="nav-link" data-view="home">Home</a>
+            <a href="/dashboard" class="nav-link active" data-view="dashboard">Dashboard</a>
+            <a href="/chat" class="nav-link" data-view="chat">Chat</a>
+            <a href="/analysis" class="nav-link" data-view="analysis">Analysis</a>
+            <a href="/features" class="nav-link" data-view="features">Features</a>
+            <a href="/contact" class="nav-link" data-view="contact">Contact</a>
+            <a href="/settings" class="nav-link" data-view="settings">Settings</a>
+            <a href="/login" class="nav-link" data-view="login" id="nav-login-btn">Login</a>
+        </div>
+        <button class="btn-primary btn-sm" id="new-analysis-btn">
+            <i class="fa-solid fa-wand-magic-sparkles"></i> New Analysis
+        </button>
+    </nav>
+
+    
+<div id="view-dashboard" class="view active-view">
+        <div class="page-header">
+            <div>
+                <div class="page-title">User <span class="text-gradient">Dashboard</span></div>
+                <div class="page-subtitle">Recent activity, verification analytics, and trend reports</div>
+            </div>
+            <div class="status-pill"><span class="dot"></span> Session Active</div>
+        </div>
+
+        <!-- Dashboard Stats Grid -->
+        <section class="stats-section" style="padding: 0; margin-bottom: 2rem;">
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <div class="stat-num" id="db-stat-accuracy">92%</div>
+                    <div class="stat-label">Average Accuracy</div>
+                    <div class="stat-sub" id="db-stat-accuracy-sub">Based on runs</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-num" id="db-stat-models">3</div>
+                    <div class="stat-label">Active Models</div>
+                    <div class="stat-sub">Simulated LLMs</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-num" id="db-stat-total">0</div>
+                    <div class="stat-label">Total Analyses</div>
+                    <div class="stat-sub" id="db-stat-total-sub">Saved locally</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-num" id="db-stat-risk">0</div>
+                    <div class="stat-label">Risk Reports</div>
+                    <div class="stat-sub" id="db-stat-risk-sub">>30% risk flagged</div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Dashboard Layout Grid -->
+        <div class="dashboard-grid">
+            <div class="db-grid-left">
+                <!-- Hybrid Risk Layout: Score Card + Mini Trend -->
+                <div class="panel-card" style="margin-bottom: 1.5rem;">
+                    <div class="panel-card-header">
+                        <i class="fa-solid fa-shield-halved text-blue"></i> Hallucination Risk Overview
+                    </div>
+                    <div class="risk-hybrid-grid">
+
+                        <!-- LEFT: Current Risk Score Card -->
+                        <div class="risk-score-card">
+                            <div class="risk-score-title">Current Hallucination Risk</div>
+                            <!-- Circular Progress -->
+                            <div class="risk-radial-wrap">
+                                <svg class="risk-radial-svg" viewBox="0 0 120 120">
+                                    <circle class="risk-radial-bg" cx="60" cy="60" r="50"/>
+                                    <circle class="risk-radial-fill" id="risk-radial-fill" cx="60" cy="60" r="50"
+                                        stroke-dasharray="0 314"
+                                        stroke-dashoffset="78.5"/>
+                                    <text class="risk-radial-pct" id="risk-radial-pct" x="60" y="56">--</text>
+                                    <text class="risk-radial-sub" id="risk-radial-sub" x="60" y="74">No Data</text>
+                                </svg>
+                            </div>
+                            <!-- Risk Level Badge -->
+                            <div class="risk-level-badge" id="risk-level-badge">— No Analysis Yet —</div>
+                            <!-- Detail rows -->
+                            <div class="risk-detail-rows">
+                                <div class="risk-detail-row">
+                                    <span class="risk-detail-icon"><i class="fa-solid fa-triangle-exclamation"></i></span>
+                                    <span class="risk-detail-label">Contradictions</span>
+                                    <span class="risk-detail-val" id="rsk-contradictions">—</span>
+                                </div>
+                                <div class="risk-detail-row">
+                                    <span class="risk-detail-icon"><i class="fa-solid fa-circle-question"></i></span>
+                                    <span class="risk-detail-label">Unsupported Claims</span>
+                                    <span class="risk-detail-val" id="rsk-unsupported">—</span>
+                                </div>
+                                <div class="risk-detail-row">
+                                    <span class="risk-detail-icon"><i class="fa-solid fa-bullseye"></i></span>
+                                    <span class="risk-detail-label">Confidence Score</span>
+                                    <span class="risk-detail-val" id="rsk-confidence">—</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- RIGHT: Mini Trend Chart -->
+                        <div class="risk-trend-side">
+                            <div class="risk-trend-header">
+                                <i class="fa-solid fa-chart-line text-blue"></i>
+                                <span>Risk Trend History</span>
+                            </div>
+                            <!-- Canvas (shown when data exists) -->
+                            <div class="risk-trend-chart-wrap" id="risk-trend-chart-wrap" style="height: 180px; position: relative;">
+                                <canvas id="dashboard-chart"></canvas>
+                            </div>
+                            <!-- Empty state (shown when no data) -->
+                            <div class="risk-trend-empty" id="risk-trend-empty">
+                                <i class="fa-solid fa-clock-rotate-left"></i>
+                                <p>No historical analysis data available</p>
+                                <span>Run your first analysis to start tracking risk over time.</span>
+                            </div>
+                        </div>
+
+                    </div>
+                </div>
+
+                <!-- Recent Analyses Table -->
+                <div class="panel-card">
+                    <div class="panel-card-header" style="justify-content: space-between; display: flex; align-items: center;">
+                        <span><i class="fa-solid fa-list-check text-purple"></i> Recent Analyses</span>
+                        <span class="panel-badge" id="db-table-count">0 total</span>
+                    </div>
+                    <div style="overflow-x: auto; margin-top: 1rem;">
+                        <table class="db-table">
+                            <thead>
+                                <tr>
+                                    <th>Date</th>
+                                    <th>Prompt</th>
+                                    <th>Risk Score</th>
+                                    <th>Verdict</th>
+                                    <th style="text-align: right;">Action</th>
+                                </tr>
+                            </thead>
+                            <tbody id="db-table-body">
+                                <tr>
+                                    <td colspan="5" style="text-align: center; color: var(--text-muted); padding: 2rem;">
+                                        No analysis runs found. Start a new analysis to see results here!
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <div class="db-grid-right">
+                <!-- Quick Actions Panel -->
+                <div class="panel-card">
+                    <div class="panel-card-header">
+                        <i class="fa-solid fa-bolt text-orange"></i> Quick Actions
+                    </div>
+                    <div class="quick-actions-list">
+                        <button class="btn-primary" onclick="navigateTo('analysis')" style="width: 100%; text-align: left; justify-content: flex-start;">
+                            <i class="fa-solid fa-wand-magic-sparkles"></i> Run New Analysis
+                        </button>
+                        <button class="btn-secondary" onclick="navigateTo('chat')" style="width: 100%; text-align: left; justify-content: flex-start; color: var(--primary); border-color: var(--primary);">
+                            <i class="fa-solid fa-comments"></i> Try Live Chat
+                        </button>
+                        <button class="btn-secondary" onclick="navigateTo('settings')" style="width: 100%; text-align: left; justify-content: flex-start;">
+                            <i class="fa-solid fa-gear"></i> Configure Settings
+                        </button>
+                        <button class="btn-secondary" id="clear-db-runs-btn" style="width: 100%; text-align: left; justify-content: flex-start; border-color: rgba(239, 68, 68, 0.4); color: #ef4444;">
+                            <i class="fa-solid fa-trash-can"></i> Clear Dashboard Data
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- About Hallucination Risk Explanation Card -->
+        <div class="panel-card" id="db-hallucination-explain" style="margin-bottom: 1.5rem;">
+            <div class="panel-card-header">
+                <i class="fa-solid fa-circle-info text-purple"></i> About Hallucination Risk
+            </div>
+            <p style="font-size: 0.92rem; color: var(--text-muted); line-height: 1.65; margin-bottom: 1.25rem;">
+                This score represents the probability that an AI-generated response contains
+                <strong>unsupported, contradictory, or fabricated information</strong> — commonly known as AI hallucination.
+            </p>
+            <div class="hallucination-explain-grid">
+                <div class="hex-factors">
+                    <div class="hex-factor-title"><i class="fa-solid fa-microscope"></i> Risk Calculation Factors</div>
+                    <ul class="hex-factor-list">
+                        <li><i class="fa-solid fa-check-circle" style="color:#6366f1"></i> NLI contradiction score</li>
+                        <li><i class="fa-solid fa-check-circle" style="color:#6366f1"></i> Grounding search mismatch</li>
+                        <li><i class="fa-solid fa-check-circle" style="color:#6366f1"></i> Cross-model disagreement</li>
+                        <li><i class="fa-solid fa-check-circle" style="color:#6366f1"></i> Heatmap uncertainty analysis</li>
+                    </ul>
+                </div>
+                <div class="hex-interpret">
+                    <div class="hex-factor-title"><i class="fa-solid fa-gauge-high"></i> Interpretation Guide</div>
+                    <div class="interpret-row">
+                        <span class="interpret-dot" style="background:#10b981"></span>
+                        <span><strong>Low (0–30%)</strong> — Mostly factual, well-grounded response</span>
+                    </div>
+                    <div class="interpret-row">
+                        <span class="interpret-dot" style="background:#f59e0b"></span>
+                        <span><strong>Medium (31–70%)</strong> — Some uncertainty or unsupported claims</span>
+                    </div>
+                    <div class="interpret-row">
+                        <span class="interpret-dot" style="background:#ef4444"></span>
+                        <span><strong>High (71–100%)</strong> — Potential hallucination detected</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Analytics & Activity Log Widgets -->
+        <div class="fr-two-col" id="db-extra-widgets" style="margin-top: 1.5rem; margin-bottom: 3rem;">
+            <div class="panel-card fr-panel-card">
+                <div class="panel-card-header">
+                    <i class="fa-solid fa-chart-pie text-purple"></i> Analytics Insights
+                </div>
+                <div class="analytics-stats" id="fr-analytics">
+                    <div style="text-align: center; color: var(--text-muted); padding: 2rem 1rem;">No data available. Run an analysis to see insights.</div>
+                </div>
+            </div>
+            <div class="panel-card fr-panel-card">
+                <div class="panel-card-header">
+                    <i class="fa-solid fa-terminal text-teal"></i> Activity Log
+                </div>
+                <div id="fr-activity-log" class="activity-log">
+                    <div style="text-align: center; color: var(--text-muted); padding: 2rem 1rem;">No activity logged yet.</div>
+                </div>
+            </div>
+        </div>
+    </div>
+<!-- Interactive Hover Tooltip -->
+    <div id="truthlens-tooltip" class="tl-tooltip hidden">
+        <div class="tl-tooltip-header">
+            <span id="tt-type">Claim Type</span>
+            <span id="tt-status" class="tt-status-pill">Status</span>
+        </div>
+        <div class="tl-tooltip-meta">
+            <i class="fa-solid fa-bullseye"></i> Confidence: <span id="tt-conf">0%</span>
+        </div>
+        <div class="tl-tooltip-reason" id="tt-reason">
+            Reason details will appear here.
+        </div>
+    </div>
+
+        <!-- 6. Footer -->
+    <footer class="main-footer">
+        <div class="footer-content">
+            <div class="footer-logo">
+                <i class="fa-solid fa-brain"></i> TruthLens <strong>AI</strong>
+            </div>
+            <div class="footer-links">
+                <a href="/">Home</a>
+                <a href="/dashboard">Dashboard</a>
+                <a href="/chat">Chat</a>
+                <a href="/about">About</a>
+                <a href="/contact">Contact</a>
+                <a href="/settings">Settings</a>
+            </div>
+            
+            <div class="footer-tech-stack">
+                <span class="footer-tech-badge">React</span>
+                <span class="footer-tech-badge">FastAPI</span>
+                <span class="footer-tech-badge">Transformers</span>
+                <span class="footer-tech-badge">NLP</span>
+                <span class="footer-tech-badge">FAISS</span>
+            </div>
+            
+            <div class="footer-copy">
+                &copy; 2026 TruthLens AI Academic Project. All rights reserved.
+            </div>
+        </div>
+    </footer>
+
+    <script src="/static/app.js"></script>
+</body>
+
+</html>
