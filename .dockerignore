@@ -1,0 +1,16 @@
+venv/
+.env
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.git
+.github
+truthlens.db
+scratch/
+scratch*.py
+check_*.py
+read_current_css_lines.py
+diff.txt
+.gitignore
+.dockerignore
